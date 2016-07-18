@@ -241,14 +241,14 @@ function cnnGameEnv:step(action, tof)
 	local delta = 0.005
 	local minlr = 0.005
 	local maxlr = 1.0
-	local outputtrain = 'train_lr_baseline1.log'--'basetrain.log'--'baseline_raw_train.log'
-	local outputtest = 'test_lr_baseline1.log'--'basetest.log'--'baseline_raw_test.log'
+	local outputtrain = 'train_lr_cnn.log' --'train_lr_noregre.log' --'train_lr_baseline1.log'--'basetrain.log'--'baseline_raw_train.log'
+	local outputtest = 'test_lr_cnn.log' --'test_lr_noregre.log' --'test_lr_baseline1.log'--'basetest.log'--'baseline_raw_test.log'
 
-    --if (action == 1) then 
-    --    self.learningRate = math.min(self.learningRate + delta, maxlr);
-    --elseif (action == 2) then 
-    --    self.learningRate = math.max(self.learningRate - delta, minlr);
-    --end
+    if (action == 1) then 
+        self.learningRate = math.min(self.learningRate + delta, maxlr);
+    elseif (action == 2) then 
+        self.learningRate = math.max(self.learningRate - delta, minlr);
+    end
 
     print('<trainer> on training set:' .. 'epoch #' .. self.epoch .. ', batchindex ' .. self.batchindex)
     trainAcc, trainErr = self:train()
@@ -258,14 +258,14 @@ function cnnGameEnv:step(action, tof)
 	print('totalbatchindex = '.. self.total_batch_number)
 
     if self.epoch % self.max_epoch <= 5 then   --let cnn train freely after 5 epoches.
-		--local w1 = self.model:get(1).weight
-		--local w2 = self.model:get(4).weight
-		--local w3 = self.model:get(8).weight
-		--local w4 = self.model:get(10).weight
-		--self:regression(self.w1, w1, 1)
-		--self:regression(self.w2, w2, 2)
-		--self:regression(self.w3, w3, 3)
-		--self:regression(self.w4, w4, 4)
+		local w1 = self.model:get(1).weight
+		local w2 = self.model:get(4).weight
+		local w3 = self.model:get(8).weight
+		local w4 = self.model:get(10).weight
+		self:regression(self.w1, w1, 1)
+		self:regression(self.w2, w2, 2)
+		self:regression(self.w3, w3, 3)
+		self:regression(self.w4, w4, 4)
     end
     if self.batchindex == self.total_batch_number then
         self.datapointer = 1 --reset the pointer
