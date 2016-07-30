@@ -4,6 +4,8 @@
 
 > My current thoughts on hyperparameter optimization can be found in my [blog post](https://bigaidream.gitbooks.io/tech-blog/content/2016/thoughts-hyperparameter.html).
 
+> We are managing this project with ZenHub following http://devblog.edsurge.com/scrum-kanban-trello-github-issues/
+
 ## Casual abstract and our motivations
 ![](https://github.com/bigaidream-projects/qan/blob/master/angry_catapult.jpg)
 
