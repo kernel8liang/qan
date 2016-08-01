@@ -141,6 +141,7 @@ function cnnGameEnv:test()
     return testAccuracy, testError
 end
 
+--[[
 function cnnGameEnv:regression(targets, weights, layernum)
 	if layernum == 1 then 
 		input_neural_number = 32
@@ -189,6 +190,7 @@ function cnnGameEnv:regression(targets, weights, layernum)
     end
     -- need to set weights back here: set back in line 161
 end
+]]
 
 function cnnGameEnv:reward(verbose, filter, tstate)
 	verbose = verbose or false
@@ -230,6 +232,11 @@ function cnnGameEnv:getState(verbose) --state is set in cnn.lua
 	end	
 end
 
+function cnnGameEnv:meta_momentum(w, targetw)
+	tmp = torch.CudaTensor(targetw:size()):copy(targetw)
+	w:add(tmp:add(-w):mul(0.01))  --w = w + (target_w - w) * 0.01
+end
+
 function cnnGameEnv:step(action, tof)
 	print('step')
 	io.flush()
@@ -241,8 +248,8 @@ function cnnGameEnv:step(action, tof)
 	local delta = 0.005
 	local minlr = 0.005
 	local maxlr = 1.0
-	local outputtrain = 'train_lr_cnn.log' --'train_lr_noregre.log' --'train_lr_baseline1.log'--'basetrain.log'--'baseline_raw_train.log'
-	local outputtest = 'test_lr_cnn.log' --'test_lr_noregre.log' --'test_lr_baseline1.log'--'basetest.log'--'baseline_raw_test.log'
+	local outputtrain = 'train_lr_cnn_metamomentum.log' --'train_lr_noregre.log' --'train_lr_baseline1.log'--'basetrain.log'--'baseline_raw_train.log'
+	local outputtest = 'test_lr_cnn_metamomentum.log' --'test_lr_noregre.log' --'test_lr_baseline1.log'--'basetest.log'--'baseline_raw_test.log'
 
     if (action == 1) then 
         self.learningRate = math.min(self.learningRate + delta, maxlr);
@@ -262,10 +269,14 @@ function cnnGameEnv:step(action, tof)
 		local w2 = self.model:get(4).weight
 		local w3 = self.model:get(8).weight
 		local w4 = self.model:get(10).weight
-		self:regression(self.w1, w1, 1)
+		self:meta_momentum(w1, self.w1)
+		self:meta_momentum(w2, self.w2)
+		self:meta_momentum(w3, self.w3)
+		self:meta_momentum(w4, self.w4)
+		--[[self:regression(self.w1, w1, 1)
 		self:regression(self.w2, w2, 2)
 		self:regression(self.w3, w3, 3)
-		self:regression(self.w4, w4, 4)
+		self:regression(self.w4, w4, 4)]]
     end
     if self.batchindex == self.total_batch_number then
         self.datapointer = 1 --reset the pointer
@@ -275,7 +286,7 @@ function cnnGameEnv:step(action, tof)
         self.trainAcc = 0
         testAcc,  testErr = self:test()
         os.execute('echo ' .. testAcc .. ' >> logs/' .. outputtest)
-        self.batchindex = 1 --reset the batch pointer
+        self.batchindex = 0 --reset the batch pointer
         self.epoch = self.epoch + 1
         print('epoch = ' .. self.epoch)
         if self.epoch > 0 and self.epoch % self.max_epoch == 0 then
