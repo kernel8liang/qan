@@ -2,16 +2,18 @@
 
 > Source code to the paper [https://arxiv.org/abs/1606.01467](https://arxiv.org/abs/1606.01467)
 
-> My current thoughts on hyperparameter optimization can be found in my [blog article](https://bigaidream.gitbooks.io/tech-blog/content/2016/thoughts-hyperparameter.html).
+> My current thoughts on hyperparameter optimization can be found in my [blog post](https://bigaidream.gitbooks.io/tech-blog/content/2016/thoughts-hyperparameter.html).
+
+> We are managing this project with ZenHub following http://devblog.edsurge.com/scrum-kanban-trello-github-issues/
 
 ## Casual abstract and our motivations
 ![](https://github.com/bigaidream-projects/qan/blob/master/angry_catapult.jpg)
 
 This paper is partially inspired by Angry Birds.
 
- All the other attempts ignore the side-effect of the global update machanism of back-propagation. We add a regressor to every layer to make sure that the positions of neurons do not change at every episode. It does not make sense for the Atari games' to change their graphics APIs at every episode. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
+All the other attempts ignore the side-effect of the global update machanism of back-propagation. In analogy to applying DQNs to Atari games, tt does not make sense for the Atari games to change their graphics APIs at every episode. Thus, we add a `meta-momentum` term to elementary optimization objective function. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
 
- Then we realize that the regressor itself can actually itself accelerate the overall hyperparameter tuning process significantly. Obviously, if we only gradually change some hyperparameters, the training trajectories of the DNN being tuned by DQNs should not differ significantly between episodes. We can think of the regressor as momentum used in stochastic gradient descent algorithms. Oh, this is also like the catapult used in Angry Birds...
+Then we realize that the `meta-momentum` can actually itself accelerate the overall hyperparameter tuning process significantly. Obviously, if we only gradually change some hyperparameters, the training trajectories of the DNN being tuned by DQNs should not differ significantly across episodes. Oh, this is also like the catapult used in Angry Birds...
 
 ## TODOs
 1. [Knowledge Distillation for further acceleration](https://github.com/bigaidream-projects/qan/issues/11)
@@ -19,6 +21,8 @@ This paper is partially inspired by Angry Birds.
 3. More experiments
 
 ## Reproduce our results on MNIST
+
+Experimental log can be found here: https://github.com/bigaidream-experiments/qan-exp
 
 ### Dependencies
 We are using Lua/Torch. The DQN component is mostly modified from [DeepMind Atari DQN](https://github.com/kuz/DeepMind-Atari-Deep-Q-Learner). 
@@ -58,17 +62,17 @@ python paint_mini_vs.py;
 
 ## FAQ
 1. `Q:` Do the actions change over time? Do they converge to something like the alternated classes with uniform sampling heuristics that is always used in CNNs? 
-`A:` Yes, from what we observed, the actions do change over time. We are making a visualization tool to show what actions have been taken at every iteration. 
+`A:` Yes, from what we observed, the actions do change over time. The visualization plot can be found [here](https://github.com/bigaidream-experiments/qan-exp/blob/master/batchvisualization/20160724/batchvisual.pdf)
 
 2. `Q:` Is the regression really necessary?
-`A:` We think the added regression operation is the most important factor making our QAN converge so faster. Actually this is also extremely useful for all hyperparameter optimization tasks. Thus we already integrated this trick into another hyperparameter tuning tool [DrMAD](https://github.com/nicholas-leonard/drmad). But we are still investigating exactly to what extent this regressor contribute to the overall performance. 
+`A:` We think the added regression operation is the most important factor making our QAN converge so faster. Actually this is also extremely useful for all hyperparameter optimization tasks. Thus we already integrated this trick into another hyperparameter tuning tool [DrMAD](https://github.com/nicholas-leonard/drmad). The comparison can be found [here](https://github.com/bigaidream-experiments/qan-exp/tree/master/no_regression/20160710)
 
 
 ## Citation
 ```
 @article{dqn-accelerate-dnn,
   title={Deep Q-Networks for Accelerating the Training of Deep Neural Networks},
-  author={Fu, Jie and Lin, Zichuan and Liu, Miao and Leonard, Nicholas and Feng, Jiashi and Chua, Tat-Seng},
+  author={Fu, Jie and Lin, Zichuan and Chen, Danlu and Liu, Miao and Leonard, Nicholas and Feng, Jiashi and Chua, Tat-Seng},
   journal={arXiv preprint arXiv:1606.01467},
   year={2016}
 }
