@@ -45,6 +45,7 @@ function cnnGameEnv:__init(opt)
 	self.terminal = false  --whether a episode game stop
     self.datapointer = 1  --serve as a pointer, scan all the training data in one iteration.
 	self.max_epoch = 20
+	self.meta_momentum_coefficient = 0.001
 end
 
 function cnnGameEnv:create_mlp_model()
@@ -234,7 +235,7 @@ end
 
 function cnnGameEnv:meta_momentum(w, targetw)
 	tmp = torch.CudaTensor(targetw:size()):copy(targetw)
-	w:add(tmp:add(-w):mul(0.01))  --w = w + (target_w - w) * 0.01
+	w:add(tmp:add(-w):mul(self.meta_momentum_coefficient))  --w = w + (target_w - w) * co-efficient
 end
 
 function cnnGameEnv:step(action, tof)
@@ -248,8 +249,8 @@ function cnnGameEnv:step(action, tof)
 	local delta = 0.005
 	local minlr = 0.005
 	local maxlr = 1.0
-	local outputtrain = 'train_lr_cnn_metamomentum.log' --'train_lr_noregre.log' --'train_lr_baseline1.log'--'basetrain.log'--'baseline_raw_train.log'
-	local outputtest = 'test_lr_cnn_metamomentum.log' --'test_lr_noregre.log' --'test_lr_baseline1.log'--'basetest.log'--'baseline_raw_test.log'
+	local outputtrain = 'train_lr_cnn_metamomentum_0.001.log' --'train_lr_noregre.log' --'train_lr_baseline1.log'--'basetrain.log'--'baseline_raw_train.log'
+	local outputtest = 'test_lr_cnn_metamomentum_0.001.log' --'test_lr_noregre.log' --'test_lr_baseline1.log'--'basetest.log'--'baseline_raw_test.log'
 
     if (action == 1) then 
         self.learningRate = math.min(self.learningRate + delta, maxlr);
