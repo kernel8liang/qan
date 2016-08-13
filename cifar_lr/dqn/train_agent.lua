@@ -49,7 +49,8 @@ cmd:text()
 local opt = cmd:parse(arg)
 
 --- General setup.
-local game_env, game_actions, agent, opt = setup(opt)
+--local game_env, game_actions, agent, opt = setup(opt)
+local game_actions, agent, opt = setup(opt)
 
 -- override print to always flush the output
 local old_print = print
@@ -75,144 +76,371 @@ local nrewards
 local nepisodes
 local episode_reward
 
-screen, reward, terminal = game_env:getState(true)
---print("reward:" .. reward)
---print("terminal:")
---print(terminal)
---
---print("Iteration ..", step)
-local win = nil
-local stepnum= 62600000 --62600000=1000games --358800--11700000 --opt.steps
-while step < stepnum do
-    step = step + 1
-	print('--------------------------------------------------------')
-    local action_index = agent:perceive(reward, screen, terminal)
+
+--CNN setting
+require 'xlua'
+require 'optim'
+require 'image'
+local tnt = require 'torchnet'
+local c = require 'trepl.colorize'
+local json = require 'cjson'
+local utils = paths.dofile'models/utils.lua'
+
+-- for memory optimizations and graph generation
+local optnet = require 'optnet'
+local graphgen = require 'optnet.graphgen'
+local iterm = require 'iterm'
+require 'iterm.dot'
 
 
-    -- game over? get next game!
-    if not terminal then
-        screen, reward, terminal = game_env:step(game_actions[action_index], true)
-    else
-        --if opt.random_starts > 0 then
-        --    screen, reward, terminal = game_env:nextRandomGame()
-        --else
-		screen, reward, terminal = game_env:getState(true)
-		reward = 0
-		terminal = false
-        --screen, reward, terminal = game_env:newGame()
-        --end
-    end
+local episode = 0
+os.execute('rm -f logs/torchnet_test_loss.log')
+
+while episode < 50 do
+		episode = episode + 1
+		local opt = {
+		  dataset = './datasets/cifar10_whitened.t7',
+		  save = 'logs',
+		  batchSize = 128,
+		  learningRate = 0.1,
+		  learningRateDecay = 0,
+		  learningRateDecayRatio = 0.2,
+		  weightDecay = 0.0005,
+		  dampening = 0,
+		  momentum = 0.9,
+		  epoch_step = "80",
+		  max_epoch = 3,
+		  model = 'nin',
+		  optimMethod = 'sgd',
+		  init_value = 10,
+		  depth = 50,
+		  shortcutType = 'A',
+		  nesterov = false,
+		  dropout = 0,
+		  hflip = true,
+		  randomcrop = 4,
+		  imageSize = 32,
+		  randomcrop_type = 'zero',
+		  cudnn_deterministic = false,
+		  optnet_optimize = true,
+		  generate_graph = false,
+		  multiply_input_factor = 1,
+		  widen_factor = 1,
+		  nGPU = 1,
+		  data_type = 'torch.CudaTensor',
+		}
+		opt = xlua.envparams(opt)
+
+		opt.epoch_step = tonumber(opt.epoch_step) or loadstring('return '..opt.epoch_step)()
+		print(opt)
+
+		print(c.blue '==>' ..' loading data')
+		local provider = torch.load(opt.dataset)
+		opt.num_classes = provider.testData.labels:max()
+
+		local function cast(x) return x:type(opt.data_type) end
+
+		print(c.blue '==>' ..' configuring model')
+		local model = nn.Sequential()
+		local net = dofile('models/'..opt.model..'.lua')(opt)
+		if opt.data_type:match'torch.Cuda.*Tensor' then
+		   require 'cudnn'
+		   require 'cunn'
+		   cudnn.convert(net, cudnn):cuda()
+		   cudnn.benchmark = true
+		   if opt.cudnn_deterministic then
+			  net:apply(function(m) if m.setMode then m:setMode(1,1,1) end end)
+		   end
+
+		   print(net)
+		   print('Network has', #net:findModules'cudnn.SpatialConvolution', 'convolutions')
+
+		   local sample_input = torch.randn(8,3,opt.imageSize,opt.imageSize):cuda()
+		   if opt.generate_graph then
+			  iterm.dot(graphgen(net, sample_input), opt.save..'/graph.pdf')
+		   end
+		   if opt.optnet_optimize then
+			  optnet.optimizeMemory(net, sample_input, {inplace = false, mode = 'training'})
+		   end
+
+		end
+		model:add(utils.makeDataParallelTable(net, opt.nGPU))
+		cast(model)
+
+		local function hflip(x)
+		   return torch.random(0,1) == 1 and x or image.hflip(x)
+		end
+
+		local function randomcrop(x)
+		   local pad = opt.randomcrop
+		   if opt.randomcrop_type == 'reflection' then
+			  module = nn.SpatialReflectionPadding(pad,pad,pad,pad):float()
+		   elseif opt.randomcrop_type == 'zero' then
+			  module = nn.SpatialZeroPadding(pad,pad,pad,pad):float()
+		   else
+			  error'unknown mode'
+		   end
+
+		   local imsize = opt.imageSize
+		   local padded = module:forward(x)
+		   local x = torch.random(1,pad*2 + 1)
+		   local y = torch.random(1,pad*2 + 1)
+		   return padded:narrow(3,x,imsize):narrow(2,y,imsize)
+		end
 
 
-    if step%1000 == 0 then collectgarbage() end
+		local function getIterator(mode)
+		   return tnt.ParallelDatasetIterator{
+			  nthread = 8,
+			  init = function()
+				 require 'torchnet'
+				 require 'image'
+				 require 'nn'
+			  end,
+			  closure = function()
+				 local dataset = provider[mode..'Data']
 
-    if step % opt.eval_freq == 0 and step > learn_start then
+				 local list_dataset = tnt.ListDataset{
+					list = torch.range(1, dataset.labels:numel()):long(),
+					load = function(idx)
+					   return {
+						  input = dataset.data[idx]:float(),
+						  target = torch.LongTensor{dataset.labels[idx]},
+					   }
+					end,
+				 }
+				 if mode == 'train' then
+					return list_dataset
+					   :shuffle()
+					   :transform{
+						  input = tnt.transform.compose{
+							 opt.hflip and hflip,
+							 opt.randomcrop > 0 and randomcrop,
+						  }
+					   }
+					   :batch(opt.batchSize, 'skip-last')
+				 else
+					return list_dataset
+					   :batch(opt.batchSize, 'include-last')
+				 end
+			  end,
+		   }
+		end
 
-        screen, reward, terminal = game_env:newGame()
+		local function log(t) print('json_stats: '..json.encode(tablex.merge(t,opt,true))) end
 
-        total_reward = 0
-        nrewards = 0
-        nepisodes = 0
-        episode_reward = 0
+		print('Will save at '..opt.save)
+		paths.mkdir(opt.save)
 
-        local eval_time = sys.clock()
-        for estep=1,opt.eval_steps do
-            local action_index = agent:perceive(reward, screen, terminal, true, 0.05)
+		local engine = tnt.OptimEngine()
+		local criterion = cast(nn.CrossEntropyCriterion())
+		local meter = tnt.AverageValueMeter()
+		local clerr = tnt.ClassErrorMeter{topk = {1}}
+		local train_timer = torch.Timer()
+		local test_timer = torch.Timer()
+		local savebaselineweight = false
 
-            -- Play game in test mode (episodes don't end when losing a life)
-            screen, reward, terminal = game_env:step(game_actions[action_index])
+		engine.hooks.onStartEpoch = function(state)
+		   local epoch = state.epoch + 1
+		   print('==>'.." online epoch # " .. epoch .. ' [batchSize = ' .. opt.batchSize .. ']')
+		   meter:reset()
+		   clerr:reset()
+		   train_timer:reset()
+		   if torch.type(opt.epoch_step) == 'number' and epoch % opt.epoch_step == 0 or
+			  torch.type(opt.epoch_step) == 'table' and tablex.find(opt.epoch_step, epoch) then
+			  opt.learningRate = opt.learningRate * opt.learningRateDecayRatio
+			  state.config = tablex.deepcopy(opt)
+			  state.optim = tablex.deepcopy(opt)
+		   end
+		end
 
-            -- display screen
-            --win = image.display({image=screen, win=win})
+		engine.hooks.onEndEpoch = function(state)
+		   local train_loss = meter:value()
+		   local train_err = clerr:value{k = 1}
+		   local train_time = train_timer:time().real
+		   meter:reset()
+		   clerr:reset()
+		   test_timer:reset()
 
-            if estep%1000 == 0 then collectgarbage() end
+		   engine:test{
+			  network = model,
+			  iterator = getIterator('test'),
+			  criterion = criterion,
+		   }
 
-            -- record every reward
-            episode_reward = episode_reward + reward
-            if reward ~= 0 then
-               nrewards = nrewards + 1
-            end
+		   log{
+			  loss = train_loss,
+			  train_loss = train_loss,
+			  train_acc = 100 - train_err,
+			  epoch = state.epoch,
+			  test_acc = 100 - clerr:value{k = 1},
+			  lr = opt.learningRate,
+			  train_time = train_time,
+			  test_time = test_timer:time().real,
+			  n_parameters = state.params:numel(),
+		   }
+		   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> logs/torchnet_test_loss.log')
+		   if savebaselineweight == true then
+			   torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
+			   for k=2,4 do
+				   torch.save('weights/'..k..'_conv1.t7', model:get(1):get(k):get(1):get(3):get(1):get(1).weight)
+				   torch.save('weights/'..k..'_conv2.t7', model:get(1):get(k):get(1):get(3):get(1):get(4).weight)
+				   torch.save('weights/'..k..'_conv3.t7', model:get(1):get(k):get(1):get(3):get(2).weight)
+				   torch.save('weights/'..k..'_conv4.t7', model:get(1):get(k):get(2):get(1):get(1):get(3).weight)
+				   torch.save('weights/'..k..'_conv5.t7', model:get(1):get(k):get(2):get(1):get(1):get(6).weight)
+			   end
+		   end
 
-            if terminal then
-                total_reward = total_reward + episode_reward
-                episode_reward = 0
-                nepisodes = nepisodes + 1
-                screen, reward, terminal = game_env:nextRandomGame()
-            end
-        end
+		end
 
-        eval_time = sys.clock() - eval_time
-        start_time = start_time + eval_time
-        agent:compute_validation_statistics()
-        local ind = #reward_history+1
-        total_reward = total_reward/math.max(1, nepisodes)
+		local final_loss = 0.0001
+		function getReward(batch_loss, verbose)
+			verbose = verbose or false
+			local reward = 0
+			--TODO: should get current error
+			if batch_loss then
+				reward = 1 / math.abs(batch_loss - final_loss) 
+			end
+			if (verbose) then
+				print ('final_loss: ' .. final_loss)
+				if batch_loss then print ('batch_loss: ' .. batch_loss) end
+				print ('reward: '.. reward)
+			end
+			return reward
+		end
 
-        if #reward_history == 0 or total_reward > torch.Tensor(reward_history):max() then
-            agent.best_network = agent.network:clone()
-        end
+		baseline_weights = torch.load('weights/4_conv5.t7') --the top conv layer
 
-        if agent.v_avg then
-            v_history[ind] = agent.v_avg
-            td_history[ind] = agent.tderr_avg
-            qmax_history[ind] = agent.q_max
-        end
-        print("V", v_history[ind], "TD error", td_history[ind], "Qmax", qmax_history[ind])
+		function getState(batch_loss, verbose) --state is set in cnn.lua
+			verbose = verbose or false
+			--return state, reward, term
+			--print(self.model:get(3):get(54):get(6))
+			local k = 4
+			local v = {}
+			for i=1,16 do v[i]=i end
+			local tstate = model:get(1):get(k):get(2):get(1):get(1):get(6).weight:index(1, torch.LongTensor(v))
+			--get model weight as state --model:get(2):get(1).weight:view(64,27):index(1, torch.LongTensor(v))
+			--local tstate = self.model:get(2):get(54):get(6).weight 
+			print(tstate:size())
+			local reward = getReward(batch_loss, verbose)
+			if terminal == true then
+				terminal = false
+				return tstate, reward, true
+			else
+				return tstate, reward, false
+			end 
+		end
 
-        reward_history[ind] = total_reward
-        reward_counts[ind] = nrewards
-        episode_counts[ind] = nepisodes
 
-        time_history[ind+1] = sys.clock() - start_time
+		function step(state, batch_loss, action, tof)
+			--take action from DQN, tune learning rate
+			--TODO
+			--[[
+				action 1: increase
+				action 2: decrease
+				action 3: unchanged 
+			]]
+			local maxlearningRate = 1
+			local minlearningRate = 0.01
+			local learningRate_delta = 0.01 --opt.learningRate * 0.1
+			if action == 1 then
+				opt.learningRate = opt.learningRate + learningRate_delta
+			elseif action == 2 then
+				opt.learningRate = opt.learningRate - learningRate_delta
+			end
+			if opt.learningRate > maxlearningRate then opt.learningRate = maxlearningRate end
+			if opt.learningRate < minlearningRate then opt.learningRate = minlearningRate end
+			print('learningRate = '..opt.learningRate)
+			state.config = tablex.deepcopy(opt)
+			state.optim = tablex.deepcopy(opt)
+			return getState(batch_loss, true)
+		end
 
-        local time_dif = time_history[ind+1] - time_history[ind]
+		--DQN init
+		screen, reward, terminal = getState(2.33, true)
+		meta_momentum_coefficient = 0.0001
+		tw = {}
+		tw[1] = torch.load('weights/1_conv1.t7')
+		tw[2] = torch.load('weights/2_conv1.t7')
+		tw[3] = torch.load('weights/2_conv2.t7')
+		tw[4] = torch.load('weights/2_conv3.t7')
+		tw[5] = torch.load('weights/2_conv4.t7')
+		tw[6] = torch.load('weights/2_conv5.t7')
+		tw[7] = torch.load('weights/3_conv1.t7')
+		tw[8] = torch.load('weights/3_conv2.t7')
+		tw[9] = torch.load('weights/3_conv3.t7')
+		tw[10] = torch.load('weights/3_conv4.t7')
+		tw[11] = torch.load('weights/3_conv5.t7')
+		tw[12] = torch.load('weights/4_conv1.t7')
+		tw[13] = torch.load('weights/4_conv2.t7')
+		tw[14] = torch.load('weights/4_conv3.t7')
+		tw[15] = torch.load('weights/4_conv4.t7')
+		tw[16] = torch.load('weights/4_conv5.t7')
+		function meta_momentum(w, targetw)
+			local tmp = torch.CudaTensor(targetw:size()):copy(targetw)
+			w:add(tmp:add(-w):mul(meta_momentum_coefficient))  --w = w + (target_w - w) * co-efficient
+		end
 
-        local training_rate = opt.actrep*opt.eval_freq/time_dif
+		local iteration_index = 0
+		--will be called after each iteration
+		engine.hooks.onForwardCriterion = function(state)
+		   meter:add(state.criterion.output)
+		   clerr:add(state.network.output, state.sample.target)
+		   local batch_loss = state.criterion.output
+		   iteration_index = iteration_index + 1
 
-        print(string.format(
-            '\nSteps: %d (frames: %d), reward: %.2f, epsilon: %.2f, lr: %G, ' ..
-            'training time: %ds, training rate: %dfps, testing time: %ds, ' ..
-            'testing rate: %dfps,  num. ep.: %d,  num. rewards: %d',
-            step, step*opt.actrep, total_reward, agent.ep, agent.lr, time_dif,
-            training_rate, eval_time, opt.actrep*opt.eval_steps/eval_time,
-            nepisodes, nrewards))
-    end
+		   if iteration_index < 100 then
+		      meta_momentum(model:get(1):get(1).weight, tw[1])
+		      k = 2
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(1).weight, tw[2])
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(4).weight, tw[3])
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(2).weight, tw[4])
+		      meta_momentum(model:get(1):get(k):get(2):get(1):get(1):get(3).weight, tw[5])
+		      meta_momentum(model:get(1):get(k):get(2):get(1):get(1):get(6).weight, tw[6])
+		      k = 3
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(1).weight, tw[7])
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(4).weight, tw[8])
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(2).weight, tw[9])
+		      meta_momentum(model:get(1):get(k):get(2):get(1):get(1):get(3).weight, tw[10])
+		      meta_momentum(model:get(1):get(k):get(2):get(1):get(1):get(6).weight, tw[11])
+		      k = 4
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(1).weight, tw[12])
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(4).weight, tw[13])
+		      meta_momentum(model:get(1):get(k):get(1):get(3):get(2).weight, tw[14])
+		      meta_momentum(model:get(1):get(k):get(2):get(1):get(1):get(3).weight, tw[15])
+		      meta_momentum(model:get(1):get(k):get(2):get(1):get(1):get(6).weight, tw[16])
+		   end
+		   --given state, take action
+		   print('--------------------------------------------------------')
+		   local action_index = agent:perceive(reward, screen, terminal)
+		   if not terminal then
+			   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
+		   else
+			   screen, reward, terminal = getState(batch_loss, true)
+			   reward = 0
+			   terminal = false
+		   end
+		end
 
-    if step % opt.save_freq == 0 or step == opt.steps then
-        local s, a, r, s2, term = agent.valid_s, agent.valid_a, agent.valid_r,
-            agent.valid_s2, agent.valid_term
-        agent.valid_s, agent.valid_a, agent.valid_r, agent.valid_s2,
-            agent.valid_term = nil, nil, nil, nil, nil, nil, nil
-        local w, dw, g, g2, delta, delta2, deltas, tmp = agent.w, agent.dw,
-            agent.g, agent.g2, agent.delta, agent.delta2, agent.deltas, agent.tmp
-        agent.w, agent.dw, agent.g, agent.g2, agent.delta, agent.delta2,
-            agent.deltas, agent.tmp = nil, nil, nil, nil, nil, nil, nil, nil
+		local inputs = cast(torch.Tensor())
+		local targets = cast(torch.Tensor())
+		engine.hooks.onSample = function(state)
+		   inputs:resize(state.sample.input:size()):copy(state.sample.input)
+		   targets:resize(state.sample.target:size()):copy(state.sample.target)
+		   state.sample.input = inputs
+		   state.sample.target = targets
+		end
 
-        local filename = opt.name
-        if opt.save_versions > 0 then
-            filename = filename .. "_" .. math.floor(step / opt.save_versions)
-        end
-        filename = filename
-        torch.save(filename .. ".t7", {agent = agent,
-                                model = agent.network,
-                                best_model = agent.best_network,
-                                reward_history = reward_history,
-                                reward_counts = reward_counts,
-                                episode_counts = episode_counts,
-                                time_history = time_history,
-                                v_history = v_history,
-                                td_history = td_history,
-                                qmax_history = qmax_history,
-                                arguments=opt})
-        if opt.saveNetworkParams then
-            local nets = {network=w:clone():float()}
-            torch.save(filename..'.params.t7', nets, 'ascii')
-        end
-        agent.valid_s, agent.valid_a, agent.valid_r, agent.valid_s2,
-            agent.valid_term = s, a, r, s2, term
-        agent.w, agent.dw, agent.g, agent.g2, agent.delta, agent.delta2,
-            agent.deltas, agent.tmp = w, dw, g, g2, delta, delta2, deltas, tmp
-        print('Saved:', filename .. '.t7')
-        io.flush()
-        collectgarbage()
-    end
+
+		engine:train{
+		   network = model,
+		   iterator = getIterator('train'),
+		   criterion = criterion,
+		   optimMethod = optim.sgd,
+		   config = tablex.deepcopy(opt),
+		   maxepoch = opt.max_epoch,
+		}
+
+		torch.save(opt.save..'/model.t7', net:clearState())
+
 end

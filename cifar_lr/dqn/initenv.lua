@@ -14,7 +14,7 @@ require 'Scale'
 require 'NeuralQLearner'
 require 'TransitionTable'
 require 'Rectifier'
-require 'cnnGameEnv'
+--require 'cnnGameEnv'
 
 
 function torchSetup(_opt)
@@ -117,8 +117,12 @@ function setup(_opt)
     --assert(framework)
 
     --local gameEnv = framework.GameEnvironment(opt)
-	local gameEnv = cnnGameEnv()
-    local gameActions = gameEnv:getActions()
+	--[[local gameEnv = cnnGameEnv()
+    local gameActions = gameEnv:getActions()]]
+    local gameActions = {}
+    for i=1,3 do
+        gameActions[i] = i
+    end
 	--print ("gameActions are:")
 	--[[for k,v in ipairs(gameActions) do
 		print(k, v)
@@ -133,7 +137,7 @@ function setup(_opt)
     end
     _opt.agent_params.verbose = _opt.verbose
     if not _opt.agent_params.state_dim then
-        _opt.agent_params.state_dim = gameEnv:nObsFeature()
+        _opt.agent_params.state_dim = 0 --TODO
     end
 
     local agent = dqn[_opt.agent](_opt.agent_params)
@@ -145,7 +149,8 @@ function setup(_opt)
         end
     end
 
-    return gameEnv, gameActions, agent, opt
+    --return gameEnv, gameActions, agent, opt
+    return gameActions, agent, opt
 end
 
 
