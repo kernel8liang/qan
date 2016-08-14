@@ -93,10 +93,15 @@ local iterm = require 'iterm'
 require 'iterm.dot'
 
 
+max_episode = 50
+output_file = 'logs/torchnet_test_loss.log'
+take_action = true
+savebaselineweight = false
 local episode = 0
-os.execute('rm -f logs/torchnet_test_loss.log')
+os.execute('rm -f ' .. output_file)
+os.execute('mkdir weights')
 
-while episode < 50 do
+while episode < max_episode do
 		episode = episode + 1
 		local opt = {
 		  dataset = './datasets/cifar10_whitened.t7',
@@ -238,7 +243,6 @@ while episode < 50 do
 		local clerr = tnt.ClassErrorMeter{topk = {1}}
 		local train_timer = torch.Timer()
 		local test_timer = torch.Timer()
-		local savebaselineweight = false
 
 		engine.hooks.onStartEpoch = function(state)
 		   local epoch = state.epoch + 1
@@ -279,7 +283,7 @@ while episode < 50 do
 			  test_time = test_timer:time().real,
 			  n_parameters = state.params:numel(),
 		   }
-		   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> logs/torchnet_test_loss.log')
+		   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
 		   if savebaselineweight == true then
 			   torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
 			   for k=2,4 do
@@ -386,6 +390,7 @@ while episode < 50 do
 		engine.hooks.onForwardCriterion = function(state)
 		   meter:add(state.criterion.output)
 		   clerr:add(state.network.output, state.sample.target)
+		   if take_action == false then return end
 		   local batch_loss = state.criterion.output
 		   iteration_index = iteration_index + 1
 
