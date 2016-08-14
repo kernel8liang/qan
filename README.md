@@ -53,6 +53,28 @@ python paint_mini_episode.py;
 python paint_mini_vs.py;
 ```
 
+### Tuning learning rates on CIFAR_10
+```bash
+luarocks install torchnet
+luarocks install optnet
+luarocks install iterm
+#Install cuDNN-5.1
+wget http://developer.download.nvidia.com/compute/redist/cudnn/v5.1/cudnn-7.5-linux-x64-v5.1.tgz
+tar xvf cudnn-7.5-linux-x64-v5.1.tgz
+sudo cp cuda/lib64/* /usr/local/cuda/lib64/
+sudo cp cuda/include/cudnn.h /usr/local/cuda/include/
+mkdir cifar_lr/dqn/datasets;
+#Download CIFAR_10 whitened dataset from [here](https://yadi.sk/d/em4b0FMgrnqxy) and save in cifar_lr/dqn/datasets
+cd cifar_lr/;
+#get baseline log and save baseline weight
+max_episode=1 take_action=0 savebaselineweight=1 output_file='logs/torchnet_test_baseline.log' ./run_gpu
+./run_gpu; #Start tune learning rate using dqn
+#To get the test curve, run following command
+cd cifar_lr/dqn/logs;
+python paint.py;
+#and check the acc.pdf
+```
+
 ### Different Settings
 1. GPU device can be set in `run_gpu` where `gpu=0`
 2. Learning rate can be set in `/ataricifar/dqn/cnnGameEnv.lua`, in the `step` function. 

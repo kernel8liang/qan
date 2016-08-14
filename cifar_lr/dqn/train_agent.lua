@@ -43,6 +43,10 @@ cmd:option('-verbose', 2,
            'the higher the level, the more information is printed to screen')
 cmd:option('-threads', 1, 'number of BLAS threads')
 cmd:option('-gpu', -1, 'gpu flag')
+cmd:option('-max_episode', 50, '')
+cmd:option('-take_action', 1, '')
+cmd:option('-savebaselineweight', 0, '')
+cmd:option('-output_file', 'logs/torchnet_test_loss.log', '')
 
 cmd:text()
 
@@ -93,10 +97,10 @@ local iterm = require 'iterm'
 require 'iterm.dot'
 
 
-max_episode = 50
-output_file = 'logs/torchnet_test_loss.log'
-take_action = true
-savebaselineweight = false
+max_episode = opt.max_episode or 50
+output_file = opt.output_file or 'logs/torchnet_test_loss.log'
+take_action = opt.take_action or 1
+savebaselineweight = opt.savebaselineweight or 0
 local episode = 0
 os.execute('rm -f ' .. output_file)
 os.execute('mkdir weights')
@@ -284,7 +288,7 @@ while episode < max_episode do
 			  n_parameters = state.params:numel(),
 		   }
 		   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
-		   if savebaselineweight == true then
+		   if savebaselineweight == 1 then
 			   torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
 			   for k=2,4 do
 				   torch.save('weights/'..k..'_conv1.t7', model:get(1):get(k):get(1):get(3):get(1):get(1).weight)
@@ -313,7 +317,11 @@ while episode < max_episode do
 			return reward
 		end
 
-		baseline_weights = torch.load('weights/4_conv5.t7') --the top conv layer
+        print (savebaselineweight)
+        print (max_episode)
+        if take_action == 1 then
+		    baseline_weights = torch.load('weights/4_conv5.t7') --the top conv layer
+        end
 
 		function getState(batch_loss, verbose) --state is set in cnn.lua
 			verbose = verbose or false
@@ -360,26 +368,28 @@ while episode < max_episode do
 			return getState(batch_loss, true)
 		end
 
-		--DQN init
-		screen, reward, terminal = getState(2.33, true)
-		meta_momentum_coefficient = 0.0001
-		tw = {}
-		tw[1] = torch.load('weights/1_conv1.t7')
-		tw[2] = torch.load('weights/2_conv1.t7')
-		tw[3] = torch.load('weights/2_conv2.t7')
-		tw[4] = torch.load('weights/2_conv3.t7')
-		tw[5] = torch.load('weights/2_conv4.t7')
-		tw[6] = torch.load('weights/2_conv5.t7')
-		tw[7] = torch.load('weights/3_conv1.t7')
-		tw[8] = torch.load('weights/3_conv2.t7')
-		tw[9] = torch.load('weights/3_conv3.t7')
-		tw[10] = torch.load('weights/3_conv4.t7')
-		tw[11] = torch.load('weights/3_conv5.t7')
-		tw[12] = torch.load('weights/4_conv1.t7')
-		tw[13] = torch.load('weights/4_conv2.t7')
-		tw[14] = torch.load('weights/4_conv3.t7')
-		tw[15] = torch.load('weights/4_conv4.t7')
-		tw[16] = torch.load('weights/4_conv5.t7')
+        if take_action == 1 then
+            --DQN init
+            screen, reward, terminal = getState(2.33, true)
+            meta_momentum_coefficient = 0.0001
+            tw = {}
+            tw[1] = torch.load('weights/1_conv1.t7')
+            tw[2] = torch.load('weights/2_conv1.t7')
+            tw[3] = torch.load('weights/2_conv2.t7')
+            tw[4] = torch.load('weights/2_conv3.t7')
+            tw[5] = torch.load('weights/2_conv4.t7')
+            tw[6] = torch.load('weights/2_conv5.t7')
+            tw[7] = torch.load('weights/3_conv1.t7')
+            tw[8] = torch.load('weights/3_conv2.t7')
+            tw[9] = torch.load('weights/3_conv3.t7')
+            tw[10] = torch.load('weights/3_conv4.t7')
+            tw[11] = torch.load('weights/3_conv5.t7')
+            tw[12] = torch.load('weights/4_conv1.t7')
+            tw[13] = torch.load('weights/4_conv2.t7')
+            tw[14] = torch.load('weights/4_conv3.t7')
+            tw[15] = torch.load('weights/4_conv4.t7')
+            tw[16] = torch.load('weights/4_conv5.t7')
+        end
 		function meta_momentum(w, targetw)
 			local tmp = torch.CudaTensor(targetw:size()):copy(targetw)
 			w:add(tmp:add(-w):mul(meta_momentum_coefficient))  --w = w + (target_w - w) * co-efficient
@@ -390,7 +400,7 @@ while episode < max_episode do
 		engine.hooks.onForwardCriterion = function(state)
 		   meter:add(state.criterion.output)
 		   clerr:add(state.network.output, state.sample.target)
-		   if take_action == false then return end
+		   if take_action == 0 then return end
 		   local batch_loss = state.criterion.output
 		   iteration_index = iteration_index + 1
 
