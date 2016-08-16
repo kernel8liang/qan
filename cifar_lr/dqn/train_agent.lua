@@ -101,14 +101,18 @@ max_episode = opt.max_episode or 50
 output_file = opt.output_file or 'logs/torchnet_test_loss.log'
 take_action = opt.take_action or 1
 savebaselineweight = opt.savebaselineweight or 0
+validation_output_file = 'logs/validation_loss.log'
 local episode = 0
 os.execute('rm -f ' .. output_file)
+os.execute('rm -f ' .. validation_output_file)
 os.execute('mkdir weights')
 
 while episode < max_episode do
 		episode = episode + 1
+		local last_validation_loss = 10000
+		local early_stop = false
 		local opt = {
-		  dataset = './datasets/cifar10_whitened.t7',
+		  dataset = './datasets/trainvalidata.t7',
 		  save = 'logs',
 		  batchSize = 128,
 		  learningRate = 0.1,
@@ -228,11 +232,14 @@ while episode < max_episode do
 						  }
 					   }
 					   :batch(opt.batchSize, 'skip-last')
-				 else
+				 elseif mode == 'test' then
 					return list_dataset
 					   :batch(opt.batchSize, 'include-last')
-				 end
-			  end,
+				 elseif mode == 'validation' then
+                    return list_dataset
+                       :batch(opt.batchSize, 'include-last')
+                 end
+			  end
 		   }
 		end
 
@@ -288,6 +295,24 @@ while episode < max_episode do
 			  n_parameters = state.params:numel(),
 		   }
 		   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
+
+		   meter:reset()
+		   clerr:reset()
+		   test_timer:reset()
+
+		   engine:test{
+			   network = model,
+			   iterator = getIterator('validation'),
+			   criterion = criterion,
+		   }
+		   os.execute('echo ' .. clerr:value{k = 1 } .. ' >> ' .. validation_output_file)
+		   if state.epoch > 28 and clerr:value{k = 1 } > last_validation_loss then
+			   early_stop = true
+			   state.epoch = opt.max_epoch
+			   os.execute('echo "episode_end" >> ' .. output_file)
+			   os.execute('echo "episode_end" >> ' .. validation_output_file)
+		   end
+		   last_validation_loss = clerr:value{k = 1 }
 		   if savebaselineweight == 1 then
 			   torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
 			   for k=2,4 do
@@ -404,7 +429,7 @@ while episode < max_episode do
 		   local batch_loss = state.criterion.output
 		   iteration_index = iteration_index + 1
 
-		   if iteration_index < 100 then
+		   if iteration_index < 10000 then
 		      meta_momentum(model:get(1):get(1).weight, tw[1])
 		      k = 2
 		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(1).weight, tw[2])
