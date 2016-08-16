@@ -65,7 +65,9 @@ sudo cp cuda/lib64/* /usr/local/cuda/lib64/
 sudo cp cuda/include/cudnn.h /usr/local/cuda/include/
 mkdir cifar_lr/dqn/datasets;
 #Download CIFAR_10 whitened dataset from [here](https://yadi.sk/d/em4b0FMgrnqxy) and save in cifar_lr/dqn/datasets
-cd cifar_lr/;
+cd cifar_lr/dqn/datasets;
+th split.lua; #get trainvalidata.t7
+cd ../..;
 #get baseline log and save baseline weight
 max_episode=1 take_action=0 savebaselineweight=1 output_file='logs/torchnet_test_baseline.log' ./run_gpu
 ./run_gpu; #Start tune learning rate using dqn
