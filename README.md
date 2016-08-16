@@ -86,10 +86,10 @@ python paint.py;
 
 ## FAQ
 1. `Q:` Do the actions change over time? Do they converge to something like the alternated classes with uniform sampling heuristics that is always used in CNNs? 
-`A:` Yes, from what we observed, the actions do change over time. The visualization plot can be found [here](https://github.com/bigaidream-experiments/qan-exp/blob/master/batchvisualization/20160724/batchvisual.pdf)
+`A:` From what we observed, the actions do change over time. But the pattern is much more complex than uniform sampling heuristics. The visualization plot can be found [here](https://github.com/bigaidream-experiments/qan-exp/blob/master/batchvisualization/20160724/batchvisual.pdf)
 
-2. `Q:` Is the regression really necessary?
-`A:` We think the added regression operation is the most important factor making our QAN converge so faster. Actually this is also extremely useful for all hyperparameter optimization tasks. Thus we already integrated this trick into another hyperparameter tuning tool [DrMAD](https://github.com/nicholas-leonard/drmad). The comparison can be found [here](https://github.com/bigaidream-experiments/qan-exp/tree/master/no_regression/20160710)
+2. `Q:` Is the meta-momentum really necessary?
+`A:` We think the added meta-momentum is the most important factor making our QAN converge so fast. Actually this is also extremely useful for all hyperparameter optimization tasks. Thus we already integrated this trick into another hyperparameter tuning tool [DrMAD](https://github.com/nicholas-leonard/drmad). The comparison can be found [here](https://github.com/bigaidream-experiments/qan-exp/tree/master/no_regression/20160710). This is somehow similar to using knowledge distillation techniques. We are still investigating this effect in more detail. 
 
 
 ## Citation
