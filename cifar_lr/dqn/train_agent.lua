@@ -108,6 +108,7 @@ os.execute('rm -f ' .. validation_output_file)
 os.execute('mkdir weights')
 
 while episode < max_episode do
+		collectgarbage()
 		episode = episode + 1
 		local last_validation_loss = 10000
 		local early_stop = false
