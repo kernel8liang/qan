@@ -97,7 +97,7 @@ local iterm = require 'iterm'
 require 'iterm.dot'
 
 
-max_episode = opt.max_episode or 50
+max_episode = opt.max_episode or 100
 output_file = opt.output_file or 'logs/torchnet_test_loss.log'
 take_action = opt.take_action or 1
 savebaselineweight = opt.savebaselineweight or 0
@@ -111,6 +111,8 @@ while episode < max_episode do
 		episode = episode + 1
 		local last_validation_loss = 10000
 		local early_stop = false
+		local meta_momentum_coefficient = 0.01
+		local min_epoch = 10
 		local opt = {
 		  dataset = './datasets/trainvalidata.t7',
 		  save = 'logs',
@@ -305,8 +307,8 @@ while episode < max_episode do
 			   iterator = getIterator('validation'),
 			   criterion = criterion,
 		   }
-		   os.execute('echo ' .. clerr:value{k = 1 } .. ' >> ' .. validation_output_file)
-		   if state.epoch > 28 and clerr:value{k = 1 } > last_validation_loss then
+		   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. ' >> ' .. validation_output_file)
+		   if state.epoch > min_epoch and clerr:value{k = 1 } > last_validation_loss then
 			   early_stop = true
 			   state.epoch = opt.max_epoch
 			   os.execute('echo "episode_end" >> ' .. output_file)
@@ -326,7 +328,7 @@ while episode < max_episode do
 
 		end
 
-		local final_loss = 0.0001
+		local final_loss = 0.001
 		function getReward(batch_loss, verbose)
 			verbose = verbose or false
 			local reward = 0
@@ -396,7 +398,6 @@ while episode < max_episode do
         if take_action == 1 then
             --DQN init
             screen, reward, terminal = getState(2.33, true)
-            meta_momentum_coefficient = 0.0001
             tw = {}
             tw[1] = torch.load('weights/1_conv1.t7')
             tw[2] = torch.load('weights/2_conv1.t7')
@@ -429,7 +430,7 @@ while episode < max_episode do
 		   local batch_loss = state.criterion.output
 		   iteration_index = iteration_index + 1
 
-		   if iteration_index < 10000 then
+		   if iteration_index < 1/meta_momentum_coefficient then
 		      meta_momentum(model:get(1):get(1).weight, tw[1])
 		      k = 2
 		      meta_momentum(model:get(1):get(k):get(1):get(3):get(1):get(1).weight, tw[2])
@@ -452,7 +453,12 @@ while episode < max_episode do
 		   end
 		   --given state, take action
 		   print('--------------------------------------------------------')
-		   local action_index = agent:perceive(reward, screen, terminal)
+		   local action_index = 0
+		   if episode % 2 == 1 then
+			   local action_index = agent:perceive(reward, screen, terminal)
+		   else 
+			   local action_index = agent:perceive(reward, screen, terminal, true, 0.05)
+		   end
 		   if not terminal then
 			   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
 		   else

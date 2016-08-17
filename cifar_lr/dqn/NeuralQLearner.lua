@@ -22,7 +22,7 @@ function nql:__init(args)
 	self.ep_start   = args.ep or 1
 	self.ep         = self.ep_start -- Exploration probability.
 	self.ep_end     = args.ep_end or self.ep
-	self.ep_endt    = args.ep_endt or 1000000
+	self.ep_endt    = args.ep_endt or 10000  --modified by lzc
 
 	---- learning rate annealing
 	self.lr_start       = args.lr or 0.01 --Learning rate.
@@ -409,9 +409,15 @@ function nql:eGreedy(state, testing_ep)
 	math.max(0, self.numSteps - self.learn_start))/self.ep_endt))
 	-- Epsilon greedy
 	if torch.uniform() < self.ep then
+		print("random action: ep="..self.ep)
+		print('ep_start=' .. self.ep_start)
+		print('ep_end=' .. self.ep_end)
+		print('ep_endt=' .. self.ep_endt)
+		print('numSteps=' .. self.numSteps)
+		print('learn_start=' .. self.learn_start)
 		return torch.random(1, self.n_actions)
 	else
-		print("greedygreedygreedygreedygreedygreedygreedygreedygreedygreedygreedygreedygreedy")
+		print("greedygreedygreedygreedygreedy: ep="..self.ep)
 		return self:greedy(state)
 	end
 end
