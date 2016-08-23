@@ -49,6 +49,8 @@ function nql:__init(args)
 	self.clip_delta     = args.clip_delta
 	self.target_q       = args.target_q
 	self.bestq          = 0
+	self.ave_q			= 0
+	self.q_num			= 0 
 
 	self.gpu            = args.gpu
 
@@ -164,6 +166,9 @@ function nql:__init(args)
 
 	self.q_max = 1
 	self.r_max = 1
+	self.q_average = 0
+	self.update_times = 0
+
 
 	self.w, self.dw = self.network:getParameters() 
 	self.dw:zero()
@@ -244,6 +249,8 @@ function nql:getQUpdate(args)
 	q = torch.FloatTensor(q_all:size(1))
 	for i=1,q_all:size(1) do
 		q[i] = q_all[i][a[i]]
+		self.q_average = self.q_average + q_all[i]:max(1)
+		self.update_times = self.update_times + 1
 	end
 	delta:add(-1, q)
 
@@ -329,17 +336,17 @@ function nql:perceive(reward, state, terminal, testing, testing_ep)
 	print ('perceive...')
 	local curState
 
+	-- reward = -1 ~ +1
 	if self.max_reward then
-		print('reward!!! = '..reward)
 		reward = math.min(reward, self.max_reward) --limit max reward
 	end
 	if self.min_reward then
-		print('reward!!! = '..reward)
 		reward = math.max(reward, self.min_reward) --limit min reward
 	end
 	if self.rescale_r then
 		self.r_max = math.max(self.r_max, reward)  --rescale max reward
 	end
+	print('reward = '..reward)
 
 	-- TODO
 	self.transitions:add_recent_state(state, terminal)
@@ -386,7 +393,7 @@ function nql:perceive(reward, state, terminal, testing, testing_ep)
 	self.lastAction = actionIndex
 	self.lastTerminal = terminal
 
-	if self.target_q and self.numSteps % self.target_q == 1 then
+	if self.target_q and self.numSteps % self.target_q == 1 then -- save network to target_network when numsteps arrive target_q
 		self.target_network = self.network:clone()
 	end
 
@@ -408,7 +415,7 @@ function nql:eGreedy(state, testing_ep)
 	math.max(0, (self.ep_start - self.ep_end) * (self.ep_endt -
 	math.max(0, self.numSteps - self.learn_start))/self.ep_endt))
 	-- Epsilon greedy
-	if torch.uniform() < self.ep then
+	if torch.uniform() < self.ep then -- 随机生成action index
 		print("random action: ep="..self.ep)
 		print('ep_start=' .. self.ep_start)
 		print('ep_end=' .. self.ep_end)
@@ -416,7 +423,7 @@ function nql:eGreedy(state, testing_ep)
 		print('numSteps=' .. self.numSteps)
 		print('learn_start=' .. self.learn_start)
 		return torch.random(1, self.n_actions)
-	else
+	else  -- 通过greedy方法得到action index
 		print("greedygreedygreedygreedygreedy: ep="..self.ep)
 		return self:greedy(state)
 	end
@@ -449,8 +456,10 @@ function nql:greedy(state)
 		end
 	end
 	self.bestq = maxq
+	self.ave_q = self.ave_q + maxq
+	self.q_num = self.q_num + 1
 
-        print(maxq)
+	print('maxq = ' .. maxq)
 	local r = torch.random(1, #besta)
 
 	self.lastAction = besta[r]
@@ -458,11 +467,14 @@ function nql:greedy(state)
 	return besta[r]
 end
 
+function nql:getAveQ()
+	return self.ave_q / self.q_num
+end
 
 function nql:createNetwork() --input: state, output: n_actions rewards (input state, then choose action whose reward is max.)
 	local n_hid = 128
 	local mlp = nn.Sequential()
-	mlp:add(nn.Reshape(self.hist_len*self.ncols*self.state_dim))
+	mlp:add(nn.Reshape(self.hist_len*self.ncols*self.state_dim))  -- 4*1*(192*192)
 	mlp:add(nn.Linear(self.hist_len*self.ncols*self.state_dim, n_hid))
 	mlp:add(nn.Rectifier())
 	mlp:add(nn.Linear(n_hid, n_hid))

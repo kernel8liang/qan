@@ -42,7 +42,7 @@ args="-framework $FRAMEWORK -game_path $game_path -name $agent_name -env_params 
 
 export learningRate=0.1
 export epoch_step="{60,120,160}"
-export max_epoch=200
+export max_epoch=5
 export learningRateDecay=0
 export learningRateDecayRatio=0.2
 export nesterov=true
