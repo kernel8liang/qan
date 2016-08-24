@@ -9,9 +9,11 @@
 ## Casual abstract and our motivations
 ![](https://github.com/bigaidream-projects/qan/blob/master/angry_catapult.jpg)
 
-This paper is partially inspired by Angry Birds.
+Let's take a look at the video of the training of deep newtorks' weights: http://cs.nyu.edu/~yann/research/sparse/psd-anim.gif  
 
-All the other attempts ignore the side-effect of the global update machanism of back-propagation. In analogy to applying DQNs to Atari games, tt does not make sense for the Atari games to change their graphics APIs at every episode. Thus, we add a `meta-momentum` term to elementary optimization objective function. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
+Imagine that we are playing a weird Atari game with the above screen. The screen seems simpler than real Atari games'. This reminds us of the difference between biomedical image processing and natural image processing. In biomedical images, the objects (e.g. red blood cells) are much simpler, thus needing simpler and smaller models. This means, we can use a small model (a DQN) to contrl the training of a larger model, e.g. a ultra deep convolutional neural networks. 
+
+However, there is one problem with this approach: when using stochastic training methods, the order of weights at very episode changes spontaneously. In analogy to applying DQNs to Atari games, it does not make sense for the Atari games to change their graphics APIs at every episode. Thus, we add a `meta-momentum` term to elementary optimization objective function. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
 
 Then we realize that the `meta-momentum` can actually itself accelerate the overall hyperparameter tuning process significantly. Obviously, if we only gradually change some hyperparameters, the training trajectories of the DNN being tuned by DQNs should not differ significantly across episodes. Oh, this is also like the catapult used in Angry Birds...
 
