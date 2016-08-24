@@ -404,9 +404,12 @@ while episode < max_episode do
 	}
 
 	torch.save(cnnopt.save..'/model.t7', net:clearState())
-	local ave_q_max = agent:getAveQ()
+	local ave_q_max = 0
+	ave_q_max = agent:getAveQ()[1]
 	print('ave_q_max = ')
 	print(ave_q_max)
+	print('Q file = ')
+	print(Q_file)
 	os.execute('echo ' .. ave_q_max .. ' >> ' .. Q_file)
 
 end
