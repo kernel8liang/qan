@@ -9,7 +9,9 @@
 ## Casual abstract and our motivations
 ![](https://github.com/bigaidream-projects/qan/blob/master/angry_catapult.jpg)
 
-Let's take a look at the video of the training of deep newtorks' weights: http://cs.nyu.edu/~yann/research/sparse/psd-anim.gif  
+Let's take a look at the video of the training of (lower-layer) deep newtorks' weights: http://cs.nyu.edu/~yann/research/sparse/psd-anim.gif  
+
+> Actually the video is about sparse coding, but they are similar to the training at lower-layer deep networks. 
 
 Imagine that we are playing a weird Atari game with the above screen. The screen seems simpler than real Atari games'. This reminds us of the difference between biomedical image processing and natural image processing. In biomedical images, the objects (e.g. red blood cells) are much simpler, thus needing simpler and smaller models. This means, we can use a small model (a DQN) to contrl the training of a larger model, e.g. a ultra deep convolutional neural networks. 
 
