@@ -468,7 +468,10 @@ function nql:greedy(state)
 end
 
 function nql:getAveQ()
-	return self.ave_q / self.q_num
+	local res = self.q_average / self.update_times
+	self.q_average = 0
+	self.update_times = 0
+	return res
 end
 
 function nql:createNetwork() --input: state, output: n_actions rewards (input state, then choose action whose reward is max.)
