@@ -34,6 +34,8 @@ We are using Lua/Torch. The DQN component is mostly modified from [DeepMind Atar
 You might need to run `install_dependencies.sh` first. 
 
 ### Tuning learning rates on MNIST
+> Please refer to this old commit: https://github.com/bigaidream-projects/qan/tree/4733b2a3ca4cad4dd882a508d8fb7fd93f91615b
+
 ```bash
 cd mnist_lr/;
 cd mnist;
@@ -46,6 +48,9 @@ python paint_lr_vs.py;
 ```
 
 ### Tuning mini-batch selection on MNIST 
+
+> Please refer to this old commit: https://github.com/bigaidream-projects/qan/tree/4733b2a3ca4cad4dd882a508d8fb7fd93f91615b
+
 ```bash
 cd mnist_minibatch;
 cd mnist;
@@ -57,7 +62,7 @@ python paint_mini_episode.py;
 python paint_mini_vs.py;
 ```
 
-### Tuning learning rates on CIFAR_10
+## Tuning learning rates on CIFAR_10 (beta version)
 ```bash
 luarocks install torchnet
 luarocks install optnet
