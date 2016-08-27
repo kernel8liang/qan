@@ -143,7 +143,7 @@ while episode < max_episode do
 
 	local function getIterator(mode)
 	   return tnt.ParallelDatasetIterator{
-		  nthread = 8,
+		  nthread = 1,
 		  init = function()
 			 require 'torchnet'
 			 require 'image'
@@ -201,70 +201,70 @@ while episode < max_episode do
 	   clerr:reset()
 	   train_timer:reset()
 	   if torch.type(cnnopt.epoch_step) == 'number' and epoch % cnnopt.epoch_step == 0 or
-		  torch.type(cnnopt.epoch_step) == 'table' and tablex.find(cnnopt.epoch_step, epoch) then
-		   cnnopt.learningRate = cnnopt.learningRate * cnnopt.learningRateDecayRatio
-		  state.config = tablex.deepcopy(cnnopt)
-		  state.optim = tablex.deepcopy(cnnopt)
+			torch.type(cnnopt.epoch_step) == 'table' and tablex.find(cnnopt.epoch_step, epoch) then
+			cnnopt.learningRate = cnnopt.learningRate * cnnopt.learningRateDecayRatio
+			state.config = tablex.deepcopy(cnnopt)
+			state.optim = tablex.deepcopy(cnnopt)
 	   end
 	end
 
 	engine.hooks.onEndEpoch = function(state)
-	   local train_loss = meter:value()
-	   local train_err = clerr:value{k = 1}
-	   local train_time = train_timer:time().real
-	   meter:reset()
-	   clerr:reset()
-	   test_timer:reset()
+		local train_loss = meter:value()
+		local train_err = clerr:value{k = 1}
+		local train_time = train_timer:time().real
+		meter:reset()
+		clerr:reset()
+		test_timer:reset()
 
 		curr_mode = 'testcnn'
-	   engine:test{
-		  network = model,
-		  iterator = getIterator('test'),
-		  criterion = criterion,
-	   }
+		engine:test{
+			network = model,
+			iterator = getIterator('test'),
+			criterion = criterion,
+		}
 		curr_mode = 'traincnn'
 
-	   log{
-		  loss = train_loss,
-		  train_loss = train_loss,
-		  train_acc = 100 - train_err,
-		  epoch = state.epoch,
-		  test_acc = 100 - clerr:value{k = 1},
-		  lr = cnnopt.learningRate,
-		  train_time = train_time,
-		  test_time = test_timer:time().real,
-		  n_parameters = state.params:numel(),
-	   }
-	   os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
+		log{
+			loss = train_loss,
+			train_loss = train_loss,
+			train_acc = 100 - train_err,
+			epoch = state.epoch,
+			test_acc = 100 - clerr:value{k = 1},
+			lr = cnnopt.learningRate,
+			train_time = train_time,
+			test_time = test_timer:time().real,
+			n_parameters = state.params:numel(),
+		}
+		os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
 
-	   --meter:reset()
-	   --clerr:reset()
-	   --test_timer:reset()
-	   --engine:test{
-	   --    network = model,
-	   --    iterator = getIterator('validation'),
-	   --    criterion = criterion,
-	   --}
-	   --os.execute('echo ' .. (100 - clerr:value{k = 1}) .. ' >> ' .. validation_output_file)
-	   --if state.epoch > min_epoch and clerr:value{k = 1 } > last_validation_loss then
-	   --    early_stop = true
-	   --    state.epoch = opt.max_epoch
-	   --    os.execute('echo "episode_end" >> ' .. output_file)
-	   --    os.execute('echo "episode_end" >> ' .. validation_output_file)
-	   --end
-	   --last_validation_loss = clerr:value{k = 1 }
-	   if state.epoch == cnnopt.max_epoch then
-	   end
-	   if savebaselineweight == 1 then
-		   torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
-		   for k=2,4 do
+		--meter:reset()
+		--clerr:reset()
+		--test_timer:reset()
+		--engine:test{
+		--    network = model,
+		--    iterator = getIterator('validation'),
+		--    criterion = criterion,
+		--}
+		--os.execute('echo ' .. (100 - clerr:value{k = 1}) .. ' >> ' .. validation_output_file)
+		--if state.epoch > min_epoch and clerr:value{k = 1 } > last_validation_loss then
+		--    early_stop = true
+		--    state.epoch = opt.max_epoch
+		--    os.execute('echo "episode_end" >> ' .. output_file)
+		--    os.execute('echo "episode_end" >> ' .. validation_output_file)
+		--end
+		--last_validation_loss = clerr:value{k = 1 }
+		if state.epoch == cnnopt.max_epoch then
+		end
+		if savebaselineweight == 1 then
+			torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
+			for k=2,4 do
 			   torch.save('weights/'..k..'_conv1.t7', model:get(1):get(k):get(1):get(3):get(1):get(1).weight)
 			   torch.save('weights/'..k..'_conv2.t7', model:get(1):get(k):get(1):get(3):get(1):get(4).weight)
 			   torch.save('weights/'..k..'_conv3.t7', model:get(1):get(k):get(1):get(3):get(2).weight)
 			   torch.save('weights/'..k..'_conv4.t7', model:get(1):get(k):get(2):get(1):get(1):get(3).weight)
 			   torch.save('weights/'..k..'_conv5.t7', model:get(1):get(k):get(2):get(1):get(1):get(6).weight)
-		   end
-	   end
+			end
+		end
 
 	end
 
@@ -338,12 +338,10 @@ while episode < max_episode do
 	--DQN init
 	screen, reward, terminal = getState(2.33, true)
 
-	print('11')
 	if take_action == 1 and add_momentum == 1 then
 		tw = {}
 		loadbaseweight(tw)
 	end
-	print('22')
 	function meta_momentum(w, targetw)
 		local tmp = torch.CudaTensor(targetw:size()):copy(targetw)
 		w:add(tmp:add(-w):mul(meta_momentum_coefficient))  --w = w + (target_w - w) * co-efficient
@@ -352,55 +350,53 @@ while episode < max_episode do
 	local iteration_index = 0
 	--will be called after each iteration
 	engine.hooks.onForwardCriterion = function(state)
-		print('33')
-	   meter:add(state.criterion.output)
-	   clerr:add(state.network.output, state.sample.target)
-	if curr_mode == 'testcnn' then return end
-	   if take_action == 0 then return end
-	   local batch_loss = state.criterion.output
-	   iteration_index = iteration_index + 1
+	    meter:add(state.criterion.output)
+	    clerr:add(state.network.output, state.sample.target)
+		if curr_mode == 'testcnn' then return end
+			if take_action == 0 then return end
+			local batch_loss = state.criterion.output
+			iteration_index = iteration_index + 1
 
-	   if iteration_index < 1/meta_momentum_coefficient and add_momentum == 1 then
-		  add_momentum_to_all_layer(model, tw)
-	   end
-	   --given state, take action
-	   print('--------------------------------------------------------')
-	   local action_index = 0
-	   if episode % 2 == 1 then
-		   action_index = agent:perceive(reward, screen, terminal)
-	   else
-		   action_index = agent:perceive(reward, screen, terminal, true, 0.05)
-		   agent:compute_validation_statistics()
-		   --local ind = #v_history + 1
-		   --v_history[ind] = agent.v_avg
-		   -- --print('agent.q_max = '.. agent.q_max)
-	   end
-	   if not terminal then
-		   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
-	   else
-		   screen, reward, terminal = getState(batch_loss, true)
-		   reward = 0
-		   terminal = false
-	   end
-	end
+			if iteration_index < 1/meta_momentum_coefficient and add_momentum == 1 then
+			  add_momentum_to_all_layer(model, tw)
+			end
+			--given state, take action
+			print('--------------------------------------------------------')
+			local action_index = 0
+			if episode % 2 == 1 then
+			   action_index = agent:perceive(reward, screen, terminal)
+			else
+			   action_index = agent:perceive(reward, screen, terminal, true, 0.05)
+			   agent:compute_validation_statistics()
+			   --local ind = #v_history + 1
+			   --v_history[ind] = agent.v_avg
+			   -- --print('agent.q_max = '.. agent.q_max)
+			end
+			if not terminal then
+			   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
+			else
+			   screen, reward, terminal = getState(batch_loss, true)
+			   reward = 0
+			   terminal = false
+			end
+		end
 
 	local inputs = cast(torch.Tensor())
 	local targets = cast(torch.Tensor())
 	engine.hooks.onSample = function(state)
-	   inputs:resize(state.sample.input:size()):copy(state.sample.input)
-	   targets:resize(state.sample.target:size()):copy(state.sample.target)
-	   state.sample.input = inputs
-	   state.sample.target = targets
+		inputs:resize(state.sample.input:size()):copy(state.sample.input)
+		targets:resize(state.sample.target:size()):copy(state.sample.target)
+		state.sample.input = inputs
+		state.sample.target = targets
 	end
 
-
 	engine:train{
-	   network = model,
-	   iterator = getIterator('train'),
-	   criterion = criterion,
-	   optimMethod = optim.sgd,
-	   config = tablex.deepcopy(cnnopt),
-	   maxepoch = cnnopt.max_epoch,
+		network = model,
+		iterator = getIterator('train'),
+		criterion = criterion,
+		optimMethod = optim.sgd,
+		config = tablex.deepcopy(cnnopt),
+		maxepoch = cnnopt.max_epoch,
 	}
 
 	torch.save(cnnopt.save..'/model.t7', net:clearState())
@@ -412,4 +408,10 @@ while episode < max_episode do
 	print(Q_file)
 	os.execute('echo ' .. ave_q_max .. ' >> ' .. Q_file)
 
+	local k = 4
+	local v = {}
+	for i=1,16 do v[i]=i end
+	local tstate = model:get(1):get(k):get(2):get(1):get(1):get(6).weight:index(1, torch.LongTensor(v))
+	torch.save('weights_pos/'..episode..'.t7', tstate)
+	--weights_pos
 end
