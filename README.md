@@ -9,9 +9,13 @@
 ## Casual abstract and our motivations
 ![](https://github.com/bigaidream-projects/qan/blob/master/angry_catapult.jpg)
 
-This paper is partially inspired by Angry Birds.
+Let's take a look at the video of the training of (lower-layer) deep newtorks' weights: http://cs.nyu.edu/~yann/research/sparse/psd-anim.gif  
 
-All the other attempts ignore the side-effect of the global update machanism of back-propagation. In analogy to applying DQNs to Atari games, tt does not make sense for the Atari games to change their graphics APIs at every episode. Thus, we add a `meta-momentum` term to elementary optimization objective function. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
+> Actually the video is about sparse coding, but they are similar to the training at lower-layer deep networks. 
+
+Imagine that we are playing a weird Atari game with the above screen. The screen seems simpler than real Atari games'. This reminds us of the difference between biomedical image processing and natural image processing. In biomedical images, the objects (e.g. red blood cells) are much simpler, thus needing simpler and smaller models. This means, we can use a small model (a DQN) to contrl the training of a larger model, e.g. a ultra deep convolutional neural networks. 
+
+However, there is one problem with this approach: when using stochastic training methods, the order of weights at very episode changes spontaneously. In analogy to applying DQNs to Atari games, it does not make sense for the Atari games to change their graphics APIs at every episode. Thus, we add a `meta-momentum` term to elementary optimization objective function. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
 
 Then we realize that the `meta-momentum` can actually itself accelerate the overall hyperparameter tuning process significantly. Obviously, if we only gradually change some hyperparameters, the training trajectories of the DNN being tuned by DQNs should not differ significantly across episodes. Oh, this is also like the catapult used in Angry Birds...
 
@@ -30,6 +34,8 @@ We are using Lua/Torch. The DQN component is mostly modified from [DeepMind Atar
 You might need to run `install_dependencies.sh` first. 
 
 ### Tuning learning rates on MNIST
+> Please refer to this old commit: https://github.com/bigaidream-projects/qan/tree/4733b2a3ca4cad4dd882a508d8fb7fd93f91615b
+
 ```bash
 cd mnist_lr/;
 cd mnist;
@@ -42,6 +48,9 @@ python paint_lr_vs.py;
 ```
 
 ### Tuning mini-batch selection on MNIST 
+
+> Please refer to this old commit: https://github.com/bigaidream-projects/qan/tree/4733b2a3ca4cad4dd882a508d8fb7fd93f91615b
+
 ```bash
 cd mnist_minibatch;
 cd mnist;
@@ -53,7 +62,7 @@ python paint_mini_episode.py;
 python paint_mini_vs.py;
 ```
 
-### Tuning learning rates on CIFAR_10
+## Tuning learning rates on CIFAR_10 (beta version)
 ```bash
 luarocks install torchnet
 luarocks install optnet
