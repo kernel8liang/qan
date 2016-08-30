@@ -20,9 +20,8 @@ However, there is one problem with this approach: when using stochastic training
 Then we realize that the `meta-momentum` can actually itself accelerate the overall hyperparameter tuning process significantly. Obviously, if we only gradually change some hyperparameters, the training trajectories of the DNN being tuned by DQNs should not differ significantly across episodes. Oh, this is also like the catapult used in Angry Birds...
 
 ## TODOs
-1. [Knowledge Distillation for further acceleration](https://github.com/bigaidream-projects/qan/issues/11)
-2. [Visualization of actions over time](https://github.com/bigaidream-projects/qan/issues/2)
-3. More experiments
+1. Binarize the weights as the states of the DQN. This will make the training of DQN even faster, [issue #22](https://github.com/bigaidream-projects/qan/issues/22)
+2. Multi-agent DQNs for individual learning rate for every layer, [issue 18](https://github.com/bigaidream-projects/qan/issues/18)
 
 ## Reproduce our results on MNIST
 
