@@ -42,9 +42,7 @@ local step = 0
 time_history[1] = 0
 
 local usegpu = true
-local cnnopt = {
-	learningRate = 0.2
-}
+
 if take_action == 1 and add_momentum == 1 then
 	tw = {}
 	loadbaseweight(tw)
@@ -55,7 +53,9 @@ while episode < max_episode do
 	local last_validation_loss = 10000
 	local early_stop = false
 	local min_epoch = 10
-
+	local cnnopt = {
+		learningRate = 0.005
+	}
 	local function getIterator(mode)
 		return tnt.ParallelDatasetIterator{
 			nthread = 1,
@@ -86,13 +86,13 @@ while episode < max_episode do
 	end
 
 	-- set up logistic regressor:
+	--[[
 	local net = nn.Sequential()
 	local Convolution = nn.SpatialConvolution
 	local Max = nn.SpatialMaxPooling
 	local Linear = nn.Linear
 	local Tanh = nn.Tanh
 	local Reshape = nn.Reshape
-	--net:add(Linear(784, 10))
 	net:add(Reshape(1,28,28))
 	net:add(Convolution(1,20,5,5))
 	net:add(nn.Tanh())
@@ -104,6 +104,8 @@ while episode < max_episode do
 	net:add(Linear(50*4*4, 500))
 	net:add(nn.Tanh())
 	net:add(Linear(500, 10))
+	]]
+	local net = torch.load('weights/net9.t7')
 	for i=1,8 do
 		if net:get(i).weight then
 			print(net:get(i).weight:size())
@@ -163,14 +165,16 @@ while episode < max_episode do
 
 		local acc = 100 - clerr:value{k = 1}
 		print('acc = ' .. acc)
-		if state.epoch == state.maxepoch then
-			print('------')
-		end
 		os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
+		if state.epoch == state.maxepoch then
+			os.execute('echo ------ >> ' .. output_file)
+			os.execute('echo ------ >> ' .. lr_file)
+		end
 		if savebaselineweight == 1 then
-			torch.save('weights/w2.t7', net:get(2).weight)
-			torch.save('weights/w5.t7', net:get(5).weight)
-			torch.save('weights/w9.t7', net:get(9).weight)
+			--torch.save('weights/w2.t7', net:get(2).weight)
+			--torch.save('weights/w5.t7', net:get(5).weight)
+			--torch.save('weights/w9.t7', net:get(9).weight)
+			torch.save('weights/net' .. state.epoch .. '.t7', net)
 		end
 
 	end
@@ -217,9 +221,9 @@ while episode < max_episode do
 			action 2: decrease
 			action 3: unchanged
 		]]
-		local maxlearningRate = 1
-		local minlearningRate = 0.005
-		local learningRate_delta = 0.005 --opt.learningRate * 0.1
+		local maxlearningRate = 0.05
+		local minlearningRate = 0.001
+		local learningRate_delta = 0.001 --opt.learningRate * 0.1
 		print('action = ' .. action)
 		if action == 1 then
 			cnnopt.learningRate = cnnopt.learningRate + learningRate_delta
@@ -230,6 +234,7 @@ while episode < max_episode do
 		if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
 		print('learningRate = '..cnnopt.learningRate)
 		state.lr = cnnopt.learningRate
+		os.execute('echo ' .. state.lr .. ' >> ' .. lr_file)
 		return getState(batch_loss, true)
 	end
 	if take_action == 1 then
@@ -247,7 +252,7 @@ while episode < max_episode do
 
 		local batch_loss = state.criterion.output
 		iteration_index = iteration_index + 1
-		if iteration_index < 1/meta_momentum_coefficient and add_momentum == 1 then
+		if iteration_index < momentum_times and add_momentum == 1 then
 			add_momentum_to_all_layer(net, tw)
 		end
 		--given state, take action
@@ -257,7 +262,6 @@ while episode < max_episode do
 		   action_index = agent:perceive(reward, screen, terminal)
 		else
 		   action_index = agent:perceive(reward, screen, terminal, true, 0.05)
-		   agent:compute_validation_statistics()
 		end
 		if not terminal then
 		   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
@@ -273,15 +277,15 @@ while episode < max_episode do
 		network   = net,
 		iterator  = getIterator('train'),
 		criterion = criterion,
-		lr = 0.05,
-		maxepoch = 10
+		lr = cnnopt.learningRate,
+		maxepoch = 5
 		--optimMethod = optim.sgd,
 		--config = tablex.deepcopy(cnnopt),
 		--maxepoch = cnnopt.max_epoch,
 	}
 
 	local ave_q_max = 0
-	ave_q_max = agent:getAveQ()[1]
+	ave_q_max = agent:getAveQ()
 	print('ave_q_max = ')
 	print(ave_q_max)
 	print('Q file = ')

@@ -45,10 +45,12 @@ opt = cmd:parse(arg)
 max_episode = 500
 output_file = 'logs/torchnet_test_loss.log'
 validation_output_file = 'logs/validation_loss.log'
+lr_file = 'logs/learning_rate.log'
+rescale_reward_file = 'logs/rescaled_rewards.log'
 Q_file = 'logs/Q.log'
 take_action = 1
 savebaselineweight = 0
-add_momentum = 1
+add_momentum = 0
 add_regression = 0
 curr_mode = 'traincnn'
 monitor_layer_index = 4
@@ -57,6 +59,9 @@ episode = 0
 os.execute('rm -f ' .. output_file)
 os.execute('rm -f ' .. validation_output_file)
 os.execute('rm -f ' .. Q_file)
+os.execute('rm -f ' .. lr_file)
+os.execute('rm -f ' .. rescale_reward_file)
+
 os.execute('mkdir weights')
 
 

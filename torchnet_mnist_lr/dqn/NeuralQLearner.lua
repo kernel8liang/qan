@@ -240,7 +240,10 @@ function nql:getQUpdate(args)
 	delta = r:clone():float()
 
 	if self.rescale_r then
-		delta:div(self.r_max)
+		delta:div(self.r_max)  -- r = r / r_max
+		reward_ = delta:float()[1]
+		print('rescaled reward = ' .. reward_)
+		os.execute('echo '..reward_..' >> logs/rescaled_rewards.log')
 	end
 	delta:add(q2)
 
@@ -346,7 +349,7 @@ function nql:perceive(reward, state, terminal, testing, testing_ep)
 	if self.rescale_r then
 		self.r_max = math.max(self.r_max, reward)  --rescale max reward
 	end
-	print('reward = '..reward)
+	print('perceive reward = '..reward)
 
 	-- TODO
 	self.transitions:add_recent_state(state, terminal)
@@ -468,9 +471,12 @@ function nql:greedy(state)
 end
 
 function nql:getAveQ()
-	local res = self.q_average / self.update_times
+	--[[local res = self.q_average / self.update_times
 	self.q_average = 0
-	self.update_times = 0
+	self.update_times = 0]]
+	local res = self.ave_q / self.q_num
+	self.ave_q = 0
+	self.q_num = 0
 	return res
 end
 

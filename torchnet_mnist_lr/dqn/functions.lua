@@ -11,7 +11,8 @@ function add_momentum_to_all_layer(model, tw)
     meta_momentum(model:get(9).weight, tw[3])
 end
 
-meta_momentum_coefficient = 0.01
+meta_momentum_coefficient = 0.0001
+momentum_times = 390*4  -- 3 epoch
 
 function meta_momentum(w, targetw)
     local tmp = torch.CudaTensor(targetw:size()):copy(targetw)
