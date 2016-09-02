@@ -19,13 +19,14 @@ However, there is one problem with this approach: when using stochastic training
 In the precious versions of the arXiv paper, we added a `meta-momentum` term to constrain the training trajectory. Now we realized that this is actually quite cumbersome. We are now implement two variants:
 
 1. Jump-start: We simply copy the weights of a CNN duing training when it achieves pretty high training accuracy (e.g. 90%) as the starting point for traning the DQN. 
-2. Bag-of-filters: We first train a CNN till convergence. We treat the weights (filters) at every iteration as images and use an unsupervised learning method to build a code-book based on them. We then use this code-book to generate bag-of-words for those filters. We fix the feature learning component of the DQN after the fist episode, and only train the action selector. 
+2. [Bag-of-filters](https://github.com/bigaidream-projects/qan/issues/25): We first train a CNN till convergence. We treat the weights (filters) at every iteration as images and use an unsupervised learning method to build a code-book based on them. We then use this code-book to generate bag-of-words for those filters. We fix the feature learning component of the DQN after the fist episode, and only train the action selector. 
 
 
 
 ## TODOs
-1. Binarize the weights as the states of the DQN. This will make the training of DQN even faster, [issue #22](https://github.com/bigaidream-projects/qan/issues/22)
-2. Multi-agent DQNs for individual learning rate for every layer, [issue 18](https://github.com/bigaidream-projects/qan/issues/18)
+1. Bag-of-visual-words for removing meta-momentum, [issue #25](https://github.com/bigaidream-projects/qan/issues/25)
+2. Binarize the weights as the states of the DQN. This will make the training of DQN even faster, [issue #22](https://github.com/bigaidream-projects/qan/issues/22)
+3. Multi-agent DQNs for individual learning rate for every layer, [issue 18](https://github.com/bigaidream-projects/qan/issues/18)
 
 ## Reproduce our results on MNIST
 
