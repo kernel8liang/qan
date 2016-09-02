@@ -6,18 +6,22 @@
 
 > We are managing this project with ZenHub following http://devblog.edsurge.com/scrum-kanban-trello-github-issues/
 
-## Casual abstract and our motivations
-![](https://github.com/bigaidream-projects/qan/blob/master/angry_catapult.jpg)
+## Abstract and motivations
 
 Let's take a look at the video of the training of (lower-layer) deep newtorks' weights: http://cs.nyu.edu/~yann/research/sparse/psd-anim.gif  
 
 > Actually the video is about sparse coding, but they are similar to the training at lower-layer deep networks. 
 
-Imagine that we are playing a weird Atari game with the above screen. The screen seems simpler than real Atari games'. This reminds us of the difference between biomedical image processing and natural image processing. In biomedical images, the objects (e.g. red blood cells) are much simpler, thus needing simpler and smaller models. This means, we can use a small model (a DQN) to contrl the training of a larger model, e.g. a ultra deep convolutional neural networks. 
+Imagine that we are playing a weird Atari game with the above screen. The screen seems simpler than real Atari games'. This reminds us of the difference between biomedical image processing and natural image processing. In biomedical images, the objects (e.g. red blood cells) are much simpler, thus needing simpler and smaller models. This means, we can use a small-sized DQN to contrl the training of a larger model, e.g. a ultra deep convolutional neural networks. 
 
-However, there is one problem with this approach: when using stochastic training methods, the order of weights at very episode changes spontaneously. In analogy to applying DQNs to Atari games, it does not make sense for the Atari games to change their graphics APIs at every episode. Thus, we add a `meta-momentum` term to elementary optimization objective function. We suspect that this is the main reason other methods need hundreds of thousands of episodes, whereas we only need 20 episodes on MNIST dataset. 
+However, there is one problem with this approach: when using stochastic training methods, the order of weights at very episode might change spontaneously. In analogy to applying DQNs to Atari games, it does not make sense for the Atari games to change their graphics APIs at every episode. 
 
-Then we realize that the `meta-momentum` can actually itself accelerate the overall hyperparameter tuning process significantly. Obviously, if we only gradually change some hyperparameters, the training trajectories of the DNN being tuned by DQNs should not differ significantly across episodes. Oh, this is also like the catapult used in Angry Birds...
+In the precious versions of the arXiv paper, we added a `meta-momentum` term to constrain the training trajectory. Now we realized that this is actually quite cumbersome. We are now implement two variants:
+
+1. Jump-start: We simply copy the weights of a CNN duing training when it achieves pretty high training accuracy (e.g. 90%) as the starting point for traning the DQN. 
+2. Bag-of-filters: We first train a CNN till convergence. We treat the weights (filters) at every iteration as images and use an unsupervised learning method to build a code-book based on them. We then use this code-book to generate bag-of-words for those filters. We remove the feature learning component of the DQN, and only train the action selector. 
+
+
 
 ## TODOs
 1. Binarize the weights as the states of the DQN. This will make the training of DQN even faster, [issue #22](https://github.com/bigaidream-projects/qan/issues/22)
@@ -95,9 +99,6 @@ python paint.py;
 ## FAQ
 1. `Q:` Do the actions change over time? Do they converge to something like the alternated classes with uniform sampling heuristics that is always used in CNNs? 
 `A:` From what we observed, the actions do change over time. But the pattern is much more complex than uniform sampling heuristics. The visualization plot can be found [here](https://github.com/bigaidream-experiments/qan-exp/blob/master/batchvisualization/20160724/batchvisual.pdf)
-
-2. `Q:` Is the meta-momentum really necessary?
-`A:` We think the added meta-momentum is the most important factor making our QAN converge so fast. Actually this is also extremely useful for all hyperparameter optimization tasks. Thus we already integrated this trick into another hyperparameter tuning tool [DrMAD](https://github.com/nicholas-leonard/drmad). The comparison can be found [here](https://github.com/bigaidream-experiments/qan-exp/tree/master/no_regression/20160710). This is somehow similar to using knowledge distillation techniques. We are still investigating this effect in more detail. 
 
 
 ## Citation
