@@ -19,7 +19,7 @@ However, there is one problem with this approach: when using stochastic training
 In the precious versions of the arXiv paper, we added a `meta-momentum` term to constrain the training trajectory. Now we realized that this is actually quite cumbersome. We are now implement two variants:
 
 1. Jump-start: We simply copy the weights of a CNN duing training when it achieves pretty high training accuracy (e.g. 90%) as the starting point for traning the DQN. 
-2. [Bag-of-filters](https://github.com/bigaidream-projects/qan/issues/25): We first train a CNN till convergence. We treat the weights (filters) at every iteration as images and use an unsupervised learning method to build a code-book based on them. We then use this code-book to generate bag-of-words for those filters. We fix the feature learning component of the DQN after the fist episode, and only train the action selector. 
+2. [Bag-of-filters](https://github.com/bigaidream-projects/qan/issues/25): We first train a CNN till convergence. We treat the weights (filters) at every iteration as images and use an unsupervised learning method to build a code-book based on them. We then use this code-book to generate bag-of-words for those filters. We remove the feature learning component of the DQN, and only train the action selector. 
 
 
 
