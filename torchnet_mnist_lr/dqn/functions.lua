@@ -11,8 +11,8 @@ function add_momentum_to_all_layer(model, tw)
     meta_momentum(model:get(9).weight, tw[3])
 end
 
-meta_momentum_coefficient = 0.0001
-momentum_times = 390*4  -- 3 epoch
+meta_momentum_coefficient = 0.01
+momentum_times = 33 --390*3  -- 3 epoch
 
 function meta_momentum(w, targetw)
     local tmp = torch.CudaTensor(targetw:size()):copy(targetw)
@@ -25,4 +25,50 @@ local old_print = print
 local print = function(...)
     old_print(...)
     io.flush()
+end
+
+function kurtosis(t)
+    local m = t:mean()
+    local sqSum = 0
+    local fourthSum = 0
+    local n = t:size()[1]
+    for i = 1, n do
+        local sq = (t[i] - m)*(t[i] - m)
+        sqSum = sqSum + sq
+        fourthSum = fourthSum + sq*sq
+    end
+    return n*fourthSum/(sqSum*sqSum) - 3
+end
+
+function skewness(t)
+    local m = t:mean()
+    local sqSum = 0
+    local thirdSum = 0
+    local n = t:size()[1]
+    for i = 1, n do
+        sqSum = sqSum + (t[i] - m)*(t[i] - m)
+        thirdSum = thirdSum + (t[i] - m)*(t[i] - m)*(t[i] - m)
+    end
+    return (thirdSum/n)/math.pow(sqSum/(n - 1), 3/2)
+end
+
+function central_moment(t, k)
+    local t_k = torch.pow(t, k)
+    return t_k:mean()
+end
+
+function k_bins_entropy(t)
+    local k = 32
+    local max_ = torch.max(t)
+    local min_ = torch.min(t)
+    local vec = torch.zeros(k)
+    local step = (max_ - min_) / k
+    local index = torch.floor(t:csub(min_):div(step)):add(1)
+    for i = 1, index:nElement() do
+        local idx = index[i]
+        if idx > 32 then idx = 32 end
+        assert(idx > 0 and idx <= 32)
+        vec[idx] = vec[idx] + 1
+    end
+    return vec
 end
