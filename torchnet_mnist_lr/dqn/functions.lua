@@ -29,27 +29,30 @@ end
 
 function kurtosis(t)
     local m = t:mean()
-    local sqSum = 0
-    local fourthSum = 0
     local n = t:size()[1]
-    for i = 1, n do
+    local cu_t = t:cuda()
+    local sqSum = cu_t:csub(m):pow(2):sum()
+    local fourthSum = cu_t:csub(m):pow(4):sum()
+    --[[for i = 1, n do
         local sq = (t[i] - m)*(t[i] - m)
         sqSum = sqSum + sq
         fourthSum = fourthSum + sq*sq
-    end
+    end]]
     return n*fourthSum/(sqSum*sqSum) - 3
 end
 
 function skewness(t)
     local m = t:mean()
-    local sqSum = 0
-    local thirdSum = 0
     local n = t:size()[1]
-    for i = 1, n do
+    local cu_t = t:cuda()
+    local sqSum = cu_t:csub(m):pow(2):sum()
+    local thirdSum = cu_t:csub(m):pow(3):sum()
+    --[[for i = 1, n do
         sqSum = sqSum + (t[i] - m)*(t[i] - m)
         thirdSum = thirdSum + (t[i] - m)*(t[i] - m)*(t[i] - m)
-    end
+    end]]
     return (thirdSum/n)/math.pow(sqSum/(n - 1), 3/2)
+    --return thirdSum_tensor:div(n):div(sqSum_tensor:div(n-1):pow(3/2))
 end
 
 function central_moment(t, k)
@@ -62,13 +65,21 @@ function k_bins_entropy(t)
     local max_ = torch.max(t)
     local min_ = torch.min(t)
     local vec = torch.zeros(k)
-    local step = (max_ - min_) / k
+    return vec
+    --[[local step = (max_ - min_) / k
+    if step == 0 then
+        vec[32] = t:nElement()
+        return vec
+    end
     local index = torch.floor(t:csub(min_):div(step)):add(1)
+    print('min_ = ' .. min_)
+    print('step = ' .. step)
+    --print(index)
     for i = 1, index:nElement() do
         local idx = index[i]
         if idx > 32 then idx = 32 end
         assert(idx > 0 and idx <= 32)
         vec[idx] = vec[idx] + 1
     end
-    return vec
+    return vec]]
 end

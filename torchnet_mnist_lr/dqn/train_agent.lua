@@ -225,7 +225,7 @@ while episode < max_episode do
 
 		function get_g_c(m)
 			--print(m:size())
-			local r = m:view(-1)
+			local r = m:reshape(m:nElement()) --m:view(-1)
 			local r_sort = torch.sort(r)
 			local n = r:nElement()
 			local n1 = math.floor(n*0.25)
@@ -250,6 +250,7 @@ while episode < max_episode do
 		end
 		function get_h_d(s, type)
 			--g_c
+			--print("haha")
 			local row = s:size(1)
 			local col = s:size(2)
 			local size = row
@@ -277,19 +278,34 @@ while episode < max_episode do
 			end
 			return h
 		end
-		local state = torch.cat(
-			get_g_c(s1),
-			get_g_c(s2),
-			get_g_c(s3),
-			get_h_d(s1),
-			get_h_d(s2),
-			get_h_d(s3),
-			get_h_d(s1:transpose(1,2)),
-			get_h_d(s2:transpose(1,2)),
-			get_h_d(s3:transpose(1,2)),
-			get_h_d(s1, 1),
-			get_h_d(s2, 1)
-		) --44*3 + 44*5*3 + 44*5*3 + 44*5*2 = 1892
+		--[[local res = {}
+		res[#res+1] = get_g_c(s1):view(-1)
+		res[#res+1] = get_g_c(s2):view(-1)
+		res[#res+1] = get_g_c(s3):view(-1)
+		res[#res+1] = get_h_d(s1):view(-1)
+		res[#res+1] = get_h_d(s2):view(-1)
+		res[#res+1] = get_h_d(s3):view(-1)
+		res[#res+1] = get_h_d(s1:transpose(1,2)):view(-1)
+		res[#res+1] = get_h_d(s2:transpose(1,2)):view(-1)
+		res[#res+1] = get_h_d(s3:transpose(1,2)):view(-1)
+		res[#res+1] = get_h_d(s1, 1):view(-1)
+		res[#res+1] = get_h_d(s2, 1):view(-1)
+		local state = res[1]
+		for i = 2, #res do
+			state = torch.cat(state, res[i])
+		end]]
+
+		local res = {}
+		res[#res+1] = get_g_c(s1):view(-1)
+		res[#res+1] = get_h_d(s1):view(-1)
+		res[#res+1] = get_h_d(s1:transpose(1,2)):view(-1)
+		res[#res+1] = get_h_d(s1, 1):view(-1)
+		local state = res[1]
+		for i = 2, #res do
+			state = torch.cat(state, res[i])
+		end
+		-- all layers: 44*3 + 44*5*3 + 44*5*3 + 44*5*2 = 1892
+		-- first layer: 44 + 44*5 + 44*5 + 44*5 = 704
 
 		print(state:size())
 		local reward = getReward(batch_loss, verbose)

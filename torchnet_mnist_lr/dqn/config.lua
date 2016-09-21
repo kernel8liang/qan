@@ -42,7 +42,7 @@ cmd:option('-output_file', 'logs/torchnet_test_loss.log', '')
 cmd:text()
 opt = cmd:parse(arg)
 
-max_episode = 500
+max_episode = 1000
 output_file = 'logs/torchnet_test_loss.log'
 validation_output_file = 'logs/validation_loss.log'
 lr_file = 'logs/learning_rate.log'

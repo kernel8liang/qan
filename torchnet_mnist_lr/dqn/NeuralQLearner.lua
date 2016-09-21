@@ -12,7 +12,7 @@ local nql = torch.class('dqn.NeuralQLearner')
 
 
 function nql:__init(args)
-	self.state_dim  = 200*125 --10*27 --512*10 --1024*5*5  --args.state_dim -- State dimensionality.
+	self.state_dim  = 704*1 --21*25 -- 200*125 --10*27 --512*10 --1024*5*5  --args.state_dim -- State dimensionality.
 	self.actions    = args.actions
 	self.n_actions  = #self.actions
 	self.verbose    = args.verbose
@@ -55,7 +55,7 @@ function nql:__init(args)
 	self.gpu            = args.gpu
 
 	self.ncols          = args.ncols or 1  -- number of color channels in input
-	self.input_dims     = args.input_dims or {self.hist_len*self.ncols, 200, 125}--10, 27} --80, 64} --10, 512} --256, 100} --{self.hist_len*self.ncols, 84, 84}
+	self.input_dims     = args.input_dims or {self.hist_len*self.ncols, 704, 1} --21, 25} --200, 125}--10, 27} --80, 64} --10, 512} --256, 100} --{self.hist_len*self.ncols, 84, 84}
 	self.preproc        = args.preproc  -- name of preprocessing network
 	self.histType       = args.histType or "linear"  -- history type to use
 	self.histSpacing    = args.histSpacing or 1
@@ -241,10 +241,10 @@ function nql:getQUpdate(args)
 
 	if self.rescale_r then
 		delta:div(self.r_max)  -- r = r / r_max
-		reward_ = delta:float()[1]
-		print('rescaled reward = ' .. reward_)
-		os.execute('echo '..reward_..' >> logs/rescaled_rewards.log')
 	end
+	reward_ = delta:float()[1]
+	print('rescaled reward = ' .. reward_)
+	os.execute('echo '..reward_..' >> logs/rescaled_rewards.log')
 	delta:add(q2)
 
 	-- q = Q(s,a)
