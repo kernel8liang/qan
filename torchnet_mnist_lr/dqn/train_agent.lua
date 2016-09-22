@@ -49,7 +49,7 @@ if take_action == 1 and add_momentum == 1 then
 end
 while episode < max_episode do
 	--collectgarbage()
-	torch.manualSeed(0)
+	--torch.manualSeed(0)
 	episode = episode + 1
 	local last_validation_loss = 10000
 	local early_stop = false
