@@ -268,6 +268,7 @@ while episode < max_episode do
 				assert(step_num >= 2, 'step_num should begin from 2 !')
 				reward = -1/(step_num/10) * log_sum
 			end
+			last_loss = batch_loss
 		end
 		if (verbose) then
 			if batch_loss then print ('batch_loss: ' .. batch_loss) end
@@ -378,23 +379,17 @@ while episode < max_episode do
 			action 5: restart
 			action 6: unchanged
 		]]
-		if step_num % 10 == 1 then last_loss = batch_loss end
 		step_num = step_num + 1
-		if step_num % 10 == 0 then
-			local maxlearningRate = 0.1
-			local minlearningRate = 0.01
+			local maxlearningRate = 0.5
+			local minlearningRate = 0.001
 			local learningRate_delta = cnnopt.learningRate --0.001 --opt.learningRate * 0.1
 			print('action = ' .. action)
 			if action == 1 then
-				cnnopt.learningRate = cnnopt.learningRate + learningRate_delta*0.1
-			elseif action == 2 then
 				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.1
-			elseif action == 3 then
-				cnnopt.learningRate = cnnopt.learningRate + learningRate_delta*0.5
-			elseif action == 4 then
+			elseif action == 2 then
 				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.5
-			elseif action == 5 then
-				cnnopt.learningRate = 0.1
+			elseif action == 3 then
+				cnnopt.learningRate = 0.5
 			end
 			if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
 			if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
@@ -404,7 +399,6 @@ while episode < max_episode do
 
 			state.config = tablex.deepcopy(cnnopt)
 			state.optim = tablex.deepcopy(cnnopt)
-		end
 		return getState(batch_loss, true)
 	end
 
