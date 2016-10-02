@@ -428,7 +428,7 @@ while episode < max_episode do
 			   action_index = agent:perceive(reward, screen, terminal)
 			else
 			   action_index = agent:perceive(reward, screen, terminal, true, 0.05)
-			   agent:compute_validation_statistics()
+			   --agent:compute_validation_statistics()
 			   --local ind = #v_history + 1
 			   --v_history[ind] = agent.v_avg
 			   -- --print('agent.q_max = '.. agent.q_max)
