@@ -81,6 +81,9 @@ while episode < max_episode do
 	local meta_momentum_coefficient = 0.01
 	local min_epoch = 10
 	local add_momentum = 0
+	local last_loss = nil
+	local step_num = 0
+	local log_sum = 0
 	cnnopt = xlua.envparams(cnnopt)
 
 	cnnopt.epoch_step = tonumber(cnnopt.epoch_step) or loadstring('return '..cnnopt.epoch_step)()
@@ -97,6 +100,7 @@ while episode < max_episode do
 	local net = dofile('models/'..cnnopt.model..'.lua')(cnnopt)
 	if cnnopt.data_type:match'torch.Cuda.*Tensor' then
 	   require 'cudnn'
+	   cudnn.fastest = true
 	   require 'cunn'
 	   cudnn.convert(net, cudnn):cuda()
 	   cudnn.benchmark = true
@@ -237,22 +241,6 @@ while episode < max_episode do
 		}
 		os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
 
-		--meter:reset()
-		--clerr:reset()
-		--test_timer:reset()
-		--engine:test{
-		--    network = model,
-		--    iterator = getIterator('validation'),
-		--    criterion = criterion,
-		--}
-		--os.execute('echo ' .. (100 - clerr:value{k = 1}) .. ' >> ' .. validation_output_file)
-		--if state.epoch > min_epoch and clerr:value{k = 1 } > last_validation_loss then
-		--    early_stop = true
-		--    state.epoch = opt.max_epoch
-		--    os.execute('echo "episode_end" >> ' .. output_file)
-		--    os.execute('echo "episode_end" >> ' .. validation_output_file)
-		--end
-		--last_validation_loss = clerr:value{k = 1 }
 		if state.epoch == cnnopt.max_epoch then
 		end
 		if savebaselineweight == 1 then
@@ -268,45 +256,113 @@ while episode < max_episode do
 
 	end
 
-	local final_loss = 0.001
+	--local final_loss = 0.001
 	function getReward(batch_loss, verbose)
 		verbose = verbose or false
 		local reward = 0
 		--TODO: should get current error
 		if batch_loss then
-			reward = 1 / math.abs(batch_loss - final_loss)
+			--reward = 1 / math.abs(batch_loss - final_loss)
+			if last_loss then
+				log_sum = log_sum + math.log(batch_loss)-math.log(last_loss)
+				assert(step_num >= 2, 'step_num should begin from 2 !')
+				reward = -1/(step_num/10) * log_sum
+			end
 		end
 		if (verbose) then
-			print ('final_loss: ' .. final_loss)
 			if batch_loss then print ('batch_loss: ' .. batch_loss) end
 			print ('reward: '.. reward)
 		end
 		return reward
 	end
 
-	print (savebaselineweight)
-	print (max_episode)
-	if take_action == 1 then
-		baseline_weights = torch.load('weights/4_conv5.t7') --the top conv layer
-	end
-
 	function getState(batch_loss, verbose) --state is set in cnn.lua
+
 		verbose = verbose or false
-		--return state, reward, term
-		--print(self.model:get(3):get(54):get(6))
-		local k = 4
-		local v = {}
-		for i=1,16 do v[i]=i end
-		local tstate = model:get(1):get(k):get(2):get(1):get(1):get(6).weight:index(1, torch.LongTensor(v))
-		--get model weight as state --model:get(2):get(1).weight:view(64,27):index(1, torch.LongTensor(v))
-		--local tstate = self.model:get(2):get(54):get(6).weight
-		--print(tstate:size())
+
+		--21*25 = 525
+		--s1 = torch.mean(s1, 1):view(-1)
+		--s2 = torch.mean(s2, 1):view(-1)
+		--local tstate = torch.cat(s1, s2)
+		--local s1 = model:get(1):get(1):get(2):get(1):get(1):get(6).weight
+		local s1 = model:get(1):get(1).weight  --16,3,3,3
+		s1 = s1:reshape(s1:size(1), s1:size(2), s1:size(3)*s1:size(4))
+
+		function get_g_c(m)
+			--print(m:size())
+			local r = m:reshape(m:nElement()) --m:view(-1)
+			local r_sort = torch.sort(r)
+			local n = r:nElement()
+			local n1 = math.floor(n*0.25)
+			local n2 = math.floor(n*0.5)
+			local n3 = math.floor(n*0.75)-- quantiles(0.25, 0.5, 0.75)
+			local g_c = torch.FloatTensor(12)
+			g_c[1] = torch.mean(r)
+			g_c[2] = r_sort[n1]
+			g_c[3] = r_sort[n2]
+			g_c[4] = r_sort[n3]
+			g_c[5] = torch.std(r)
+			g_c[6] = skewness(r)
+			g_c[7] = kurtosis(r)
+			g_c[8] = central_moment(r, 1)
+			g_c[9] = central_moment(r, 2)
+			g_c[10] = central_moment(r, 3)
+			g_c[11] = central_moment(r, 4)
+			g_c[12] = central_moment(r, 5)
+			local g_c_44 = torch.cat(g_c, k_bins_entropy(r))
+
+			return g_c_44
+		end
+		function get_h_d(s, type)
+			--g_c
+			--print("haha")
+			local row = s:size(1)
+			local col = s:size(2)
+			local size = row
+			type = type or 0
+			if type == 1 then
+				size = row * col
+				s = s:reshape(size, s:size(3))
+			end
+			local g = torch.FloatTensor(size, 44) -- 44 = 12 + 32
+			for i = 1, size do
+				local g_c = get_g_c(s[i])
+				g[i] = g_c
+			end
+			g = g:transpose(1, 2)  -- 13 rows
+			--h_c
+			local h = torch.FloatTensor(44, 5)
+			for i = 1, 44 do
+				local h_d = torch.FloatTensor(5)
+				h_d[1] = torch.mean(g[i])
+				h_d[2] = torch.median(g[i])
+				h_d[3] = torch.std(g[i])
+				h_d[4] = torch.max(g[i])
+				h_d[5] = torch.min(g[i])
+				h[i] = h_d
+			end
+			return h
+		end
+
+		local res = {}
+		res[#res+1] = get_g_c(s1):view(-1)
+		res[#res+1] = get_h_d(s1):view(-1)
+		res[#res+1] = get_h_d(s1:transpose(1,2)):view(-1)
+		res[#res+1] = get_h_d(s1, 1):view(-1)
+		local state = res[1]
+		for i = 2, #res do
+			state = torch.cat(state, res[i])
+		end
+		-- all layers: 44*3 + 44*5*3 + 44*5*3 + 44*5*2 = 1892
+		-- first layer: 44 + 44*5 + 44*5 + 44*5 = 704
+
+		print(state:size())
 		local reward = getReward(batch_loss, verbose)
 		if terminal == true then
 			terminal = false
-			return tstate, reward, true
+			return state, reward, true
 		else
-			return tstate, reward, false
+			return state, reward, false
 		end
 	end
 
@@ -315,36 +371,47 @@ while episode < max_episode do
 		--take action from DQN, tune learning rate
 		--TODO
 		--[[
-			action 1: increase
-			action 2: decrease
-			action 3: unchanged
+			action 1: increase by 10%
+			action 2: decrease by 10%
+			action 3: increase by 50%
+			action 4: decrease by 50%
+			action 5: restart
+			action 6: unchanged
 		]]
-		local maxlearningRate = 1
-		local minlearningRate = 0.01
-		local learningRate_delta = 0.01 --opt.learningRate * 0.1
-		print('action = ' .. action)
-		if action == 1 then
-			cnnopt.learningRate = cnnopt.learningRate + learningRate_delta
-		elseif action == 2 then
-			cnnopt.learningRate = cnnopt.learningRate - learningRate_delta
+		if step_num % 10 == 1 then last_loss = batch_loss end
+		step_num = step_num + 1
+		if step_num % 10 == 0 then
+			local maxlearningRate = 0.1
+			local minlearningRate = 0.01
+			local learningRate_delta = cnnopt.learningRate --0.001 --opt.learningRate * 0.1
+			print('action = ' .. action)
+			if action == 1 then
+				cnnopt.learningRate = cnnopt.learningRate + learningRate_delta*0.1
+			elseif action == 2 then
+				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.1
+			elseif action == 3 then
+				cnnopt.learningRate = cnnopt.learningRate + learningRate_delta*0.5
+			elseif action == 4 then
+				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.5
+			elseif action == 5 then
+				cnnopt.learningRate = 0.1
+			end
+			if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
+			if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
+			print('learningRate = '..cnnopt.learningRate)
+			state.lr = cnnopt.learningRate
+			os.execute('echo ' .. state.lr .. ' >> ' .. lr_file)
+
+			state.config = tablex.deepcopy(cnnopt)
+			state.optim = tablex.deepcopy(cnnopt)
 		end
-		if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
-		if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
-		print('learningRate = '..cnnopt.learningRate)
-		state.config = tablex.deepcopy(cnnopt)
-		state.optim = tablex.deepcopy(cnnopt)
 		return getState(batch_loss, true)
 	end
-	--DQN init
-	screen, reward, terminal = getState(2.33, true)
 
-	if take_action == 1 and add_momentum == 1 then
-		tw = {}
-		loadbaseweight(tw)
-	end
-	function meta_momentum(w, targetw)
-		local tmp = torch.CudaTensor(targetw:size()):copy(targetw)
-		w:add(tmp:add(-w):mul(meta_momentum_coefficient))  --w = w + (target_w - w) * co-efficient
+	if take_action == 1 then
+		--DQN init
+		screen, reward, terminal = getState(2.33, true)
+		step_num = 1
 	end
 
 	local iteration_index = 0
@@ -399,19 +466,6 @@ while episode < max_episode do
 		maxepoch = cnnopt.max_epoch,
 	}
 
-	torch.save(cnnopt.save..'/model.t7', net:clearState())
-	local ave_q_max = 0
-	ave_q_max = agent:getAveQ()[1]
-	print('ave_q_max = ')
-	print(ave_q_max)
-	print('Q file = ')
-	print(Q_file)
-	os.execute('echo ' .. ave_q_max .. ' >> ' .. Q_file)
 
-	local k = 4
-	local v = {}
-	for i=1,16 do v[i]=i end
-	local tstate = model:get(1):get(k):get(2):get(1):get(1):get(6).weight:index(1, torch.LongTensor(v))
-	torch.save('weights_pos/'..episode..'.t7', tstate)
-	--weights_pos
+
 end

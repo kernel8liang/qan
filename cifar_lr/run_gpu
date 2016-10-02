@@ -13,7 +13,7 @@ update_freq=4
 actrep=4
 discount=0.99
 seed=1
-learn_start=1000
+learn_start=6000
 pool_frms_type="\"max\""
 pool_frms_size=2
 initial_priority="false"
@@ -42,7 +42,7 @@ args="-framework $FRAMEWORK -game_path $game_path -name $agent_name -env_params 
 
 export learningRate=0.1
 export epoch_step="{60,120,160}"
-export max_epoch=5
+export max_epoch=10
 export learningRateDecay=0
 export learningRateDecayRatio=0.2
 export nesterov=true
