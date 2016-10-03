@@ -16,14 +16,6 @@ Imagine that we are playing a weird Atari game with the above screen. The screen
 
 However, there is one problem with this approach: when using stochastic training methods, the order of weights at very episode might change spontaneously. In analogy to applying DQNs to Atari games, it does not make sense for the Atari games to change their graphics APIs at every episode. 
 
-In the precious versions of the arXiv paper, we added a `meta-momentum` term to constrain the training trajectory. Now we realized that this is actually quite cumbersome. We are now implement a new method:
-
-Similar to [Deep Apprenticeship Learning for Playing Video Games], we can initialize the policies of DQNs from ADAM. The ADAM is used to train a CNN and record the learning rates at every iteration. Then the initial policy of the DQN is trained by mapping the states to learning rates (i.e. a regression). [issue #29](https://github.com/bigaidream-projects/qan/issues/29)
-
-
-## TODOs
-1. Apprenticeship learning for initialization, [#29](https://github.com/bigaidream-projects/qan/issues/29)
-
 ## Reproduce our results on MNIST
 
 Experimental log can be found here: https://github.com/bigaidream-experiments/qan-exp
