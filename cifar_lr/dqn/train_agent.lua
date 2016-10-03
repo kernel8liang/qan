@@ -310,9 +310,9 @@ while episode < max_episode do
 			g_c[10] = central_moment(r, 3)
 			g_c[11] = central_moment(r, 4)
 			g_c[12] = central_moment(r, 5)
-			local g_c_44 = torch.cat(g_c, k_bins_entropy(r))
-
-			return g_c_44
+			--local g_c_44 = torch.cat(g_c, k_bins_entropy(r))
+			--return g_c_44
+			return g_c
 		end
 		function get_h_d(s, type)
 			--g_c
@@ -325,15 +325,15 @@ while episode < max_episode do
 				size = row * col
 				s = s:reshape(size, s:size(3))
 			end
-			local g = torch.FloatTensor(size, 44) -- 44 = 12 + 32
+			local g = torch.FloatTensor(size, 12)
 			for i = 1, size do
 				local g_c = get_g_c(s[i])
 				g[i] = g_c
 			end
 			g = g:transpose(1, 2)  -- 13 rows
 			--h_c
-			local h = torch.FloatTensor(44, 5)
-			for i = 1, 44 do
+			local h = torch.FloatTensor(12, 5)
+			for i = 1, 12 do
 				local h_d = torch.FloatTensor(5)
 				h_d[1] = torch.mean(g[i])
 				h_d[2] = torch.median(g[i])
@@ -350,12 +350,13 @@ while episode < max_episode do
 		res[#res+1] = get_h_d(s1):view(-1)
 		res[#res+1] = get_h_d(s1:transpose(1,2)):view(-1)
 		res[#res+1] = get_h_d(s1, 1):view(-1)
+		--concat LR
+		res[#res+1] = torch.FloatTensor{cnnopt.learningRate}
 		local state = res[1]
 		for i = 2, #res do
 			state = torch.cat(state, res[i])
 		end
-		-- all layers: 44*3 + 44*5*3 + 44*5*3 + 44*5*2 = 1892
-		-- first layer: 44 + 44*5 + 44*5 + 44*5 = 704
+		--12 + 12*5 + 12*5 + 12*5 + 1 = 193
 
 		print(state:size())
 		local reward = getReward(batch_loss, verbose)
@@ -372,12 +373,9 @@ while episode < max_episode do
 		--take action from DQN, tune learning rate
 		--TODO
 		--[[
-			action 1: increase by 10%
-			action 2: decrease by 10%
-			action 3: increase by 50%
-			action 4: decrease by 50%
-			action 5: restart
-			action 6: unchanged
+			action 1: decrease by 10%
+			action 2: decrease by 50%
+			action 3: restart
 		]]
 		step_num = step_num + 1
 			local maxlearningRate = 0.5
