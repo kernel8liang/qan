@@ -122,6 +122,7 @@ while episode < max_episode do
 
 	-- set up training engine:
 	local engine = tnt.SGDEngine()
+	if take_action == 0 then engine = tnt.OptimEngine() end
 	local meter  = tnt.AverageValueMeter()
 	local clerr  = tnt.ClassErrorMeter{topk = {1}}
 	engine.hooks.onStartEpoch = function(state)
@@ -364,16 +365,26 @@ while episode < max_episode do
 	end
 
 	-- train the model:
-	engine:train{
-		network   = net,
-		iterator  = getIterator('train'),
-		criterion = criterion,
-		lr = cnnopt.learningRate,
-		maxepoch = 20
-		--optimMethod = optim.sgd,
-		--config = tablex.deepcopy(cnnopt),
-		--maxepoch = cnnopt.max_epoch,
-	}
+	if take_action == 1 then
+		engine:train{
+			network   = net,
+			iterator  = getIterator('train'),
+			criterion = criterion,
+			lr = cnnopt.learningRate,
+			maxepoch = 20
+		}
+	else
+		engine:train{
+			network   = net,
+			iterator  = getIterator('train'),
+			criterion = criterion,
+			optimMethod = optim.adam,
+			config = {
+				learningRate = cnnopt.learningRate
+			},
+			maxepoch = 20
+		}
+	end
 
 	local ave_q_max = 0
 	ave_q_max = agent:getAveQ()
