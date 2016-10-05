@@ -206,9 +206,9 @@ while episode < max_episode do
 		return reward
 	end
 
-	if take_action == 1 then
-		baseline_weights = torch.load('weights/w.t7') --the top conv layer
-	end
+--	if take_action == 1 then
+--		baseline_weights = torch.load('weights/w.t7') --the top conv layer
+--	end
 
 	function getState(batch_loss, verbose) --state is set in cnn.lua
 		verbose = verbose or false
@@ -286,7 +286,7 @@ while episode < max_episode do
 		res[#res+1] = get_h_d(s1, 1):view(-1)
 
 		--concat LR in weight feature
-		res[#res+1] = torch.FloatTensor{cnnopt.learningRate}
+		res[#res+1] = torch.FloatTensor{cnnopt.learningRate}:log()
 		local state = res[1]
 		for i = 2, #res do
 			state = torch.cat(state, res[i])
@@ -307,28 +307,18 @@ while episode < max_episode do
 		--take action from DQN, tune learning rate
 		--TODO
 		--[[
-			action 1: increase by 10%
-			action 2: decrease by 10%
-			action 3: increase by 50%
-			action 4: decrease by 50%
-			action 5: restart
-			action 6: unchanged
+			action 1: decrease by 7%
+			action 2: Restart
 		]]
 		step_num = step_num + 1
-		local maxlearningRate = 0.05
+		local maxlearningRate = 0.2
 		local minlearningRate = 0.00001
 		local learningRate_delta = state.lr --0.001 --opt.learningRate * 0.1
 		print('action = ' .. action)
 		if action == 1 then
-			cnnopt.learningRate = cnnopt.learningRate + learningRate_delta*0.1
+			cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.07
 		elseif action == 2 then
-			cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.1
-		elseif action == 3 then
-			cnnopt.learningRate = cnnopt.learningRate + learningRate_delta*0.5
-		elseif action == 4 then
-			cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.5
-		elseif action == 5 then
-			cnnopt.learningRate = 0.005
+			cnnopt.learningRate = 0.2
 		end
 		if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
 		if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end

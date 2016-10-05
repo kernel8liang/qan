@@ -120,7 +120,7 @@ function setup(_opt)
 	--[[local gameEnv = cnnGameEnv()
     local gameActions = gameEnv:getActions()]]
     local gameActions = {}
-    for i=1,6 do
+    for i=1,2 do
         gameActions[i] = i
     end
 	--print ("gameActions are:")
