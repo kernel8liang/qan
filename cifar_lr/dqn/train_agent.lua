@@ -378,16 +378,14 @@ while episode < max_episode do
 			action 3: restart
 		]]
 		step_num = step_num + 1
-			local maxlearningRate = 0.5
-			local minlearningRate = 0.001
+			local maxlearningRate = 0.1
+			local minlearningRate = 0.00001
 			local learningRate_delta = cnnopt.learningRate --0.001 --opt.learningRate * 0.1
 			print('action = ' .. action)
 			if action == 1 then
-				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.1
+				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.03
 			elseif action == 2 then
-				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.5
-			elseif action == 3 then
-				cnnopt.learningRate = 0.5
+				cnnopt.learningRate = 0.1
 			end
 			if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
 			if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end

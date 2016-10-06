@@ -71,6 +71,7 @@ function torchSetup(_opt)
             print('Using CPU code only. GPU device id:', opt.gpu)
         end
     end
+    cutorch.setDevice(2)
 
     --- set up random number generators
     -- removing lua RNG; seeding torch RNG with opt.seed and setting cutorch
@@ -120,7 +121,7 @@ function setup(_opt)
 	--[[local gameEnv = cnnGameEnv()
     local gameActions = gameEnv:getActions()]]
     local gameActions = {}
-    for i=1,3 do
+    for i=1,2 do
         gameActions[i] = i
     end
 	--print ("gameActions are:")
