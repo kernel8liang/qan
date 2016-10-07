@@ -53,8 +53,8 @@ local cnnopt = {
 	dampening = 0,
 	momentum = 0.9,
 	epoch_step = "80",
-	max_epoch = 3,
-	model = 'nin',
+	max_epoch = 10,
+	model = 'wide-resnet',
 	optimMethod = 'sgd',
 	init_value = 10,
 	depth = 50,
@@ -273,9 +273,11 @@ while episode < max_episode do
 			end
 			last_loss = batch_loss
 		end
-		if (verbose) then
-			if batch_loss then print ('batch_loss: ' .. batch_loss) end
-			print ('reward: '.. reward)
+		if verbose then
+			if batch_loss and reward then
+				print ('batch_loss: ' .. batch_loss)
+				print ('reward: '.. reward)
+			end
 		end
 		return reward
 	end
@@ -293,7 +295,6 @@ while episode < max_episode do
 		s1 = s1:reshape(s1:size(1), s1:size(2), s1:size(3)*s1:size(4))
 
 		function get_g_c(m)
-			--print(m:size())
 			local r = m:reshape(m:nElement()) --m:view(-1)
 			local r_sort = torch.sort(r)
 			local n = r:nElement()
@@ -319,7 +320,6 @@ while episode < max_episode do
 		end
 		function get_h_d(s, type)
 			--g_c
-			--print("haha")
 			local row = s:size(1)
 			local col = s:size(2)
 			local size = row
@@ -384,7 +384,9 @@ while episode < max_episode do
 		--FIXME: 保证每个 episode 开始 last_loss 都等于nil
 		step_num = step_num + 1
 
-		print('action = ' .. action)
+		if verbose then
+			print('action = ' .. action)
+		end
 		global_action = action
 
 		return getState(batch_loss, true)
@@ -408,7 +410,9 @@ while episode < max_episode do
 			iteration_index = iteration_index + 1
 
 			--given state, take action
-			print('--------------------------------------------------------')
+			if verbose then
+				print('--------------------------------------------------------')
+			end
 			local action_index = 0
 			if episode % 2 == 1 then
 			   action_index = agent:perceive(reward, screen, terminal)

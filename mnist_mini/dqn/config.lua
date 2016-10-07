@@ -46,17 +46,31 @@ max_episode = 1000
 output_file = 'logs/torchnet_test_loss.log'
 validation_output_file = 'logs/validation_loss.log'
 lr_file = 'logs/learning_rate.log'
+rescale_reward_file = 'logs/rescaled_rewards.log'
 Q_file = 'logs/Q.log'
 take_action = 1
 savebaselineweight = 0
+add_momentum = 0
+add_regression = 0
 curr_mode = 'traincnn'
+monitor_layer_index = 4
 verbose = false
+episode = 0                 --will add 1 before train, so train!=0, test=0
+dqn_test_interval = 2
+DQN_mode = 'train'
 
-episode = 0
-os.execute('rm -f ' .. output_file)
-os.execute('rm -f ' .. validation_output_file)
+output_file_writer = io.open(output_file, 'w+')
+Q_file_writer = io.open(Q_file, 'w+')
+lr_file_writer = io.open(lr_file, 'w+')
+rescale_reward_file_writer = io.open(rescale_reward_file, 'w+')
+validation_output_file_writer = io.open(validation_output_file, 'w+')
+
+--[[os.execute('rm -f ' .. validation_output_file)
 os.execute('rm -f ' .. Q_file)
-os.execute('mkdir weights')
+os.execute('rm -f ' .. lr_file)
+os.execute('rm -f ' .. rescale_reward_file)
+]]
+--os.execute('mkdir weights')
 
 
 --[[

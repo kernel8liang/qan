@@ -7,14 +7,12 @@ See LICENSE file for full terms of limited license.
 if not dqn then
 	require 'initenv'
 end
-
 require 'config'
-
 local nql = torch.class('dqn.NeuralQLearner')
 
 
 function nql:__init(args)
-	self.state_dim  = 202 * 1  --192*192 --10*27 --512*10 --1024*5*5  --args.state_dim -- State dimensionality.
+	self.state_dim  = 202*1 --21*25 -- 200*125 --10*27 --512*10 --1024*5*5  --args.state_dim -- State dimensionality.
 	self.actions    = args.actions
 	self.n_actions  = #self.actions
 	self.verbose    = args.verbose
@@ -57,7 +55,7 @@ function nql:__init(args)
 	self.gpu            = args.gpu
 
 	self.ncols          = args.ncols or 1  -- number of color channels in input
-	self.input_dims     = args.input_dims or {self.hist_len*self.ncols, 202, 1} --192, 192}--10, 27} --80, 64} --10, 512} --256, 100} --{self.hist_len*self.ncols, 84, 84}
+	self.input_dims     = args.input_dims or {self.hist_len*self.ncols, 202, 1} --21, 25} --200, 125}--10, 27} --80, 64} --10, 512} --256, 100} --{self.hist_len*self.ncols, 84, 84}
 	self.preproc        = args.preproc  -- name of preprocessing network
 	self.histType       = args.histType or "linear"  -- history type to use
 	self.histSpacing    = args.histSpacing or 1
@@ -242,8 +240,13 @@ function nql:getQUpdate(args)
 	delta = r:clone():float()
 
 	if self.rescale_r then
-		delta:div(self.r_max)
+		delta:div(self.r_max)  -- r = r / r_max
 	end
+	reward_ = delta:float()[1]
+	if verbose then
+		print('rescaled reward = ' .. reward_)
+	end
+	rescale_reward_file_writer:write(string.format('%.7f\n', reward_))
 	delta:add(q2)
 
 	-- q = Q(s,a)
@@ -348,7 +351,7 @@ function nql:perceive(reward, state, terminal, testing, testing_ep)
 		self.r_max = math.max(self.r_max, reward)  --rescale max reward
 	end
 	if verbose then
-		print('reward = '..reward)
+		print('perceive reward = '..reward)
 	end
 
 	-- TODO
@@ -476,9 +479,12 @@ function nql:greedy(state)
 end
 
 function nql:getAveQ()
-	local res = self.q_average / self.update_times
+	--[[local res = self.q_average / self.update_times
 	self.q_average = 0
-	self.update_times = 0
+	self.update_times = 0]]
+	local res = self.ave_q / self.q_num
+	self.ave_q = 0
+	self.q_num = 0
 	return res
 end
 
