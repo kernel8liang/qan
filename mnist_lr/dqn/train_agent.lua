@@ -4,220 +4,383 @@ Copyright (c) 2014 Google Inc.
 See LICENSE file for full terms of limited license.
 ]]
 
-if not dqn then
-    require "initenv"
-end
-
-local cmd = torch.CmdLine()
-cmd:text()
-cmd:text('Train Agent in Environment:')
-cmd:text()
-cmd:text('Options:')
-
-cmd:option('-framework', '', 'name of training framework')
-cmd:option('-env', '', 'name of environment to use')
-cmd:option('-game_path', '', 'path to environment file (ROM)')
-cmd:option('-env_params', '', 'string of environment parameters')
-cmd:option('-pool_frms', '',
-           'string of frame pooling parameters (e.g.: size=2,type="max")')
-cmd:option('-actrep', 1, 'how many times to repeat action')
-cmd:option('-random_starts', 0, 'play action 0 between 1 and random_starts ' ..
-           'number of times at the start of each training episode')
-
-cmd:option('-name', '', 'filename used for saving network and training history')
-cmd:option('-network', '', 'reload pretrained network')
-cmd:option('-agent', '', 'name of agent file to use')
-cmd:option('-agent_params', '', 'string of agent parameters')
-cmd:option('-seed', 1, 'fixed input seed for repeatable experiments')
-cmd:option('-saveNetworkParams', false,
-           'saves the agent network in a separate file')
-cmd:option('-prog_freq', 5*10^7, 'frequency of progress output')
-cmd:option('-save_freq', 5*10^7, 'the model is saved every save_freq steps')
-cmd:option('-eval_freq', 10^7, 'frequency of greedy evaluation')
-cmd:option('-save_versions', 0, '')
-
-cmd:option('-steps', 10^6, 'number of training steps to perform')
-cmd:option('-eval_steps', 10^5, 'number of evaluation steps')
-
-cmd:option('-verbose', 2,
-           'the higher the level, the more information is printed to screen')
-cmd:option('-threads', 1, 'number of BLAS threads')
-cmd:option('-gpu', -1, 'gpu flag')
-
-cmd:text()
-
-local opt = cmd:parse(arg)
-
---- General setup.
-local game_env, game_actions, agent, opt = setup(opt)
-
--- override print to always flush the output
-local old_print = print
-local print = function(...)
-    old_print(...)
-    io.flush()
-end
-
-local learn_start = agent.learn_start
-local start_time = sys.clock()
-local reward_counts = {}
-local episode_counts = {}
-local time_history = {}
-local v_history = {}
-local qmax_history = {}
-local td_history = {}
-local reward_history = {}
-local step = 0
-time_history[1] = 0
-
+if not dqn then require "initenv" end
+require 'config'
+require 'functions'
+--CNN setting
+require 'xlua'
+require 'optim'
+require 'image'
+local tnt = require 'torchnet'
+-- for memory optimizations and graph generation
+require 'iterm.dot'
 local total_reward
 local nrewards
 local nepisodes
 local episode_reward
 
-screen, reward, terminal = game_env:getState(true)
---print("reward:" .. reward)
---print("terminal:")
---print(terminal)
---
---print("Iteration ..", step)
-local win = nil
-local stepnum= 1000000 --171600 --62600000 --62600000=1000games --358800--11700000 --opt.steps
-while step < stepnum do
-    step = step + 1
-	print('--------------------------------------------------------')
-	local action_index 
-	if step < 800000 then
-		action_index = agent:perceive(reward, screen, terminal)
-	else 
-		action_index = agent:perceive(reward, screen, terminal, true, 0.05)
+local opt = opt
+--- General setup.
+--local game_env, game_actions, agent, opt = setup(opt)
+local game_actions, agent, opt = setup(opt)
+
+local step = 0
+
+local usegpu = true
+
+if take_action == 1 and add_momentum == 1 then
+	tw = {}
+	loadbaseweight(tw)
+end
+while episode < max_episode do
+	--collectgarbage()
+	--torch.manualSeed(0)
+	episode = episode + 1
+	local last_validation_loss = 10000
+	local early_stop = false
+	local min_epoch = 10
+	local last_loss = nil
+	local step_num = 0
+	local log_sum = 0
+	local cnnopt = {
+		learningRate = 0.005
+	}
+	local function getIterator(mode)
+		return tnt.ParallelDatasetIterator{
+			nthread = 1,
+			init    = function() require 'torchnet' end,
+			closure = function()
+
+				-- load MNIST dataset:
+				local mnist = require 'mnist'
+				local dataset = mnist[mode .. 'dataset']()
+
+				dataset.data = dataset.data:reshape(dataset.data:size(1),
+					dataset.data:size(2) * dataset.data:size(3)):double()
+				-- return batches of data:
+				return tnt.BatchDataset{
+					batchsize = 128,
+					dataset = tnt.ListDataset{  -- replace this by your own dataset
+						list = torch.range(1, dataset.data:size(1)):long(),
+						load = function(idx)
+							return {
+								input  = dataset.data[idx],
+								target = torch.LongTensor{dataset.label[idx] + 1},
+							}  -- sample contains input and target
+						end,
+					}
+				}
+			end,
+		}
+	end
+
+	-- set up logistic regressor:
+
+	local net = nn.Sequential()
+	local Convolution = nn.SpatialConvolution
+	local Max = nn.SpatialMaxPooling
+	local Linear = nn.Linear
+	local Tanh = nn.Tanh
+	local Reshape = nn.Reshape
+	net:add(Reshape(1,28,28))
+	net:add(Convolution(1,20,5,5))
+	net:add(nn.Tanh())
+	net:add(Max(2,2,2,2))
+	net:add(Convolution(20,50,5,5))
+	net:add(nn.Tanh())
+	net:add(Max(2,2,2,2))
+	net:add(Reshape(50*4*4))
+	net:add(Linear(50*4*4, 500))
+	net:add(nn.Tanh())
+	net:add(Linear(500, 10))
+
+	--torch.save('weights/start_w5.t7', net:get(5).weight)
+
+	--local net = torch.load('weights/net9.t7')
+	for i=1,8 do
+		if net:get(i).weight then
+			if verbose then
+				print(net:get(i).weight:size())
+			end
+		end
+	end
+	print(net)
+	local criterion = nn.CrossEntropyCriterion()
+
+	-- set up training engine:
+	local engine = tnt.SGDEngine()
+	if take_action == 0 then engine = tnt.OptimEngine() end
+	local meter  = tnt.AverageValueMeter()
+	local clerr  = tnt.ClassErrorMeter{topk = {1}}
+	engine.hooks.onStartEpoch = function(state)
+		meter:reset()
+		clerr:reset()
+	end
+	engine.hooks.onForwardCriterion = function(state)
+		meter:add(state.criterion.output)
+		clerr:add(state.network.output, state.sample.target)
+		if state.training then
+			print(string.format('avg. loss: %2.4f; avg. error: %2.4f',
+				meter:value(), clerr:value{k = 1}))
+		end
+	end
+
+	-- set up GPU training:
+	if usegpu then
+		-- copy model to GPU:
+		require 'cunn'
+		net       = net:cuda()
+		criterion = criterion:cuda()
+		-- copy sample to GPU buffer:
+		local igpu, tgpu = torch.CudaTensor(), torch.CudaTensor()
+		engine.hooks.onSample = function(state)
+			igpu:resize(state.sample.input:size() ):copy(state.sample.input)
+			tgpu:resize(state.sample.target:size()):copy(state.sample.target)
+			state.sample.input  = igpu
+			state.sample.target = tgpu
+		end  -- alternatively, this logic can be implemented via a TransformDataset
 	end
 
 
-    -- game over? get next game!
-    if not terminal then
-        screen, reward, terminal = game_env:step(game_actions[action_index], true)
-    else
-        --if opt.random_starts > 0 then
-        --    screen, reward, terminal = game_env:nextRandomGame()
-        --else
-		screen, reward, terminal = game_env:getState(true)
-		reward = 0
-		terminal = false
-        --screen, reward, terminal = game_env:newGame()
-        --end
-    end
+	engine.hooks.onEndEpoch = function(state)
+		local train_loss = meter:value()
+		local train_err = clerr:value{k = 1 }
+		os.execute('echo ' .. (100 - train_err) .. '>> ' .. train_output_file)
+		meter:reset()
+		clerr:reset()
+		curr_mode = 'testcnn'
+		engine:test{
+			network = net,
+			iterator = getIterator('test'),
+			criterion = criterion,
+		}
+		curr_mode = 'traincnn'
 
 
-    if step%1000 == 0 then collectgarbage() end
+		local teset_acc = 100 - clerr:value{k = 1 }
+		if verbose then
+			print('test_acc = ' .. test_acc)
+		end
+		os.execute('echo ' .. test_acc .. '>> ' .. output_file)
+		if state.epoch == state.maxepoch then
+			os.execute('echo ------- >> ' .. train_output_file)
+			os.execute('echo ------- >> ' .. output_file)
+			os.execute('echo ------- >> ' .. lr_file)
+		end
+		if savebaselineweight == 1 then
+			--torch.save('weights/w2.t7', net:get(2).weight)
+			--torch.save('weights/w5.t7', net:get(5).weight)
+			--torch.save('weights/'..episode..'_w9.t7', net:get(9).weight)
+			torch.save('weights/end_w5.t7', net:get(5).weight)
+			--torch.save('weights/net' .. state.epoch .. '.t7', net)
+		end
 
-    if step % opt.eval_freq == 0 and step > learn_start then
+	end
 
-        screen, reward, terminal = game_env:newGame()
-
-        total_reward = 0
-        nrewards = 0
-        nepisodes = 0
-        episode_reward = 0
-
-        local eval_time = sys.clock()
-        for estep=1,opt.eval_steps do
-            local action_index = agent:perceive(reward, screen, terminal, true, 0.05)
-
-            -- Play game in test mode (episodes don't end when losing a life)
-            screen, reward, terminal = game_env:step(game_actions[action_index])
-
-            -- display screen
-            --win = image.display({image=screen, win=win})
-
-            if estep%1000 == 0 then collectgarbage() end
-
-            -- record every reward
-            episode_reward = episode_reward + reward
-            if reward ~= 0 then
-               nrewards = nrewards + 1
+	function getReward(batch_loss)
+		local reward = 0
+		--TODO: should get current error
+		if batch_loss then
+			--reward = 1 / math.abs(batch_loss - final_loss)
+			if last_loss then
+				log_sum = log_sum + math.log(batch_loss)-math.log(last_loss)
+				assert(step_num >= 2, 'step_num should begin from 2 !')
+				reward = -1/(step_num-1) * log_sum
+			end
+			last_loss = batch_loss
+		end
+		if verbose then
+			if batch_loss and reward then
+                print ('batch_loss: ' .. batch_loss)
+                print ('reward: '.. reward)
             end
+		end
+		return reward
+	end
 
-            if terminal then
-                total_reward = total_reward + episode_reward
-                episode_reward = 0
-                nepisodes = nepisodes + 1
-                screen, reward, terminal = game_env:nextRandomGame()
-            end
-        end
+--	if take_action == 1 then
+--		baseline_weights = torch.load('weights/w.t7') --the top conv layer
+--	end
 
-        eval_time = sys.clock() - eval_time
-        start_time = start_time + eval_time
-        agent:compute_validation_statistics()
-        local ind = #reward_history+1
-        total_reward = total_reward/math.max(1, nepisodes)
+	function getState(batch_loss) --state is set in cnn.lua
 
-        if #reward_history == 0 or total_reward > torch.Tensor(reward_history):max() then
-            agent.best_network = agent.network:clone()
-        end
+		local s1 = net:get(2).weight --20*25 (20,1,5,5)
+		local s2 = net:get(5).weight --25 (50,20,5,5)
 
-        if agent.v_avg then
-            v_history[ind] = agent.v_avg
-            td_history[ind] = agent.tderr_avg
-            qmax_history[ind] = agent.q_max
-        end
-        print("V", v_history[ind], "TD error", td_history[ind], "Qmax", qmax_history[ind])
+		--21*25 = 525
+		--s1 = torch.mean(s1, 1):view(-1)
+		--s2 = torch.mean(s2, 1):view(-1)
+		--local tstate = torch.cat(s1, s2)
+		s1 = s1:reshape(s1:size(1), s1:size(2), s1:size(3)*s1:size(4))
+		s2 = s2:reshape(s2:size(1), s2:size(2), s2:size(3)*s2:size(4))
 
-        reward_history[ind] = total_reward
-        reward_counts[ind] = nrewards
-        episode_counts[ind] = nepisodes
+		function get_g_c(m)
+			local r = m:reshape(m:nElement()) --m:view(-1)
+			local r_sort = torch.sort(r)
+			local n = r:nElement()
+			local n1 = math.floor(n*0.25)
+			local n2 = math.floor(n*0.5)
+			local n3 = math.floor(n*0.75)-- quantiles(0.25, 0.5, 0.75)
+			local g_c = torch.FloatTensor(12)
+			g_c[1] = torch.mean(r)
+			g_c[2] = r_sort[n1]
+			g_c[3] = r_sort[n2]
+			g_c[4] = r_sort[n3]
+			g_c[5] = torch.std(r)
+			g_c[6] = skewness(r)
+			g_c[7] = kurtosis(r)
+			g_c[8] = central_moment(r, 1)
+			g_c[9] = central_moment(r, 2)
+			g_c[10] = central_moment(r, 3)
+			g_c[11] = central_moment(r, 4)
+			g_c[12] = central_moment(r, 5)
+			--local g_c_44 = torch.cat(g_c, k_bins_entropy(r))
+			--return g_c_44
+			return g_c
+		end
+		function get_h_d(s_param, type)
+			--g_c
+			local s = torch.Tensor(20,1,25):copy(s_param)
+			local row = s:size(1)
+			local col = s:size(2)
+			local size = row
+			type = type or 0
+			if type == 1 then
+				size = row * col
+				s = s:reshape(size, s:size(3))
+			end
+			local g = torch.FloatTensor(size, 12) -- 44 = 12 + 32
+			for i = 1, size do
+				local g_c = get_g_c(s[i])
+				g[i] = g_c
+			end
+			g = g:transpose(1, 2)  -- 13 rows
+			--h_c
+			local h = torch.FloatTensor(12, 5)
+			for i = 1, 12 do
+				local h_d = torch.FloatTensor(5)
+				h_d[1] = torch.mean(g[i])
+				h_d[2] = torch.median(g[i])
+				h_d[3] = torch.std(g[i])
+				h_d[4] = torch.max(g[i])
+				h_d[5] = torch.min(g[i])
+				h[i] = h_d
+			end
+			return h
+		end
 
-        time_history[ind+1] = sys.clock() - start_time
+		local res = {}
+		res[#res+1] = get_g_c(s1):view(-1)
+		res[#res+1] = get_h_d(s1):view(-1)
+		res[#res+1] = get_h_d(s1:transpose(1,2)):view(-1)
+		res[#res+1] = get_h_d(s1, 1):view(-1)
 
-        local time_dif = time_history[ind+1] - time_history[ind]
+		--concat LR in weight feature
+		res[#res+1] = torch.FloatTensor{cnnopt.learningRate}:log()
+		local state = res[1]
+		for i = 2, #res do
+			state = torch.cat(state, res[i])
+		end
+		-- first layer: 12 + 12*5 + 12*5 + 12*5 + 1 = 193
 
-        local training_rate = opt.actrep*opt.eval_freq/time_dif
+		local reward = getReward(batch_loss)
+		if terminal == true then
+			terminal = false
+			return state, reward, true
+		else
+			return state, reward, false
+		end
+	end
 
-        print(string.format(
-            '\nSteps: %d (frames: %d), reward: %.2f, epsilon: %.2f, lr: %G, ' ..
-            'training time: %ds, training rate: %dfps, testing time: %ds, ' ..
-            'testing rate: %dfps,  num. ep.: %d,  num. rewards: %d',
-            step, step*opt.actrep, total_reward, agent.ep, agent.lr, time_dif,
-            training_rate, eval_time, opt.actrep*opt.eval_steps/eval_time,
-            nepisodes, nrewards))
-    end
+	function step(state, batch_loss, action, tof)
+		--take action from DQN, tune learning rate
+		--TODO
+		--[[
+			action 1: decrease by 7%
+			action 2: Restart
+		]]
+		step_num = step_num + 1
+		local maxlearningRate = 0.2
+		local minlearningRate = 0.00001
+		local learningRate_delta = state.lr --0.001 --opt.learningRate * 0.1
+		if action == 1 then
+			cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.07
+		elseif action == 2 then
+			cnnopt.learningRate = 0.2
+		end
+		if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
+		if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
+		if verbose then
+			print('action = ' .. action)
+			print('learningRate = '.. cnnopt.learningRate)
+		end
+		state.lr = cnnopt.learningRate
+		os.execute('echo ' .. state.lr .. ' >> ' .. lr_file)
+		return getState(batch_loss)
+	end
+	if take_action == 1 then
+		--DQN init
+		screen, reward, terminal = getState(2.33)
+		step_num = 1
+	end
 
-    if step % opt.save_freq == 0 or step == opt.steps then
-        local s, a, r, s2, term = agent.valid_s, agent.valid_a, agent.valid_r,
-            agent.valid_s2, agent.valid_term
-        agent.valid_s, agent.valid_a, agent.valid_r, agent.valid_s2,
-            agent.valid_term = nil, nil, nil, nil, nil, nil, nil
-        local w, dw, g, g2, delta, delta2, deltas, tmp = agent.w, agent.dw,
-            agent.g, agent.g2, agent.delta, agent.delta2, agent.deltas, agent.tmp
-        agent.w, agent.dw, agent.g, agent.g2, agent.delta, agent.delta2,
-            agent.deltas, agent.tmp = nil, nil, nil, nil, nil, nil, nil, nil
+	local iteration_index = 0
+	--will be called after each iteration
+	engine.hooks.onForwardCriterion = function(state)
+	    meter:add(state.criterion.output)
+	    clerr:add(state.network.output, state.sample.target)
+		if curr_mode == 'testcnn' then return end
+		if take_action == 0 then return end
 
-        local filename = opt.name
-        if opt.save_versions > 0 then
-            filename = filename .. "_" .. math.floor(step / opt.save_versions)
-        end
-        filename = filename
-        torch.save(filename .. ".t7", {agent = agent,
-                                model = agent.network,
-                                best_model = agent.best_network,
-                                reward_history = reward_history,
-                                reward_counts = reward_counts,
-                                episode_counts = episode_counts,
-                                time_history = time_history,
-                                v_history = v_history,
-                                td_history = td_history,
-                                qmax_history = qmax_history,
-                                arguments=opt})
-        if opt.saveNetworkParams then
-            local nets = {network=w:clone():float()}
-            torch.save(filename..'.params.t7', nets, 'ascii')
-        end
-        agent.valid_s, agent.valid_a, agent.valid_r, agent.valid_s2,
-            agent.valid_term = s, a, r, s2, term
-        agent.w, agent.dw, agent.g, agent.g2, agent.delta, agent.delta2,
-            agent.deltas, agent.tmp = w, dw, g, g2, delta, delta2, deltas, tmp
-        print('Saved:', filename .. '.t7')
-        io.flush()
-        collectgarbage()
-    end
+		local batch_loss = state.criterion.output
+		iteration_index = iteration_index + 1
+		if iteration_index < momentum_times and add_momentum == 1 then
+			add_momentum_to_all_layer(net, tw)
+		end
+		--given state, take action
+		if verbose then
+			print('--------------------------------------------------------')
+		end
+		local action_index = 0
+		if episode % 2 == 1 then
+		   action_index = agent:perceive(reward, screen, terminal)
+		else
+		   action_index = agent:perceive(reward, screen, terminal, true, 0.05)
+		end
+		if not terminal then
+		   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
+		else
+		   screen, reward, terminal = getState(batch_loss)
+		   reward = 0
+		   terminal = false
+		end
+	end
+
+	-- train the model:
+	if take_action == 1 then
+		engine:train{
+			network   = net,
+			iterator  = getIterator('train'),
+			criterion = criterion,
+			lr = cnnopt.learningRate,
+			maxepoch = 20
+		}
+	else  --user adam in baseline experiment
+		engine:train{
+			network   = net,
+			iterator  = getIterator('train'),
+			criterion = criterion,
+			optimMethod = optim.adam,
+			config = {
+				learningRate = cnnopt.learningRate
+			},
+			maxepoch = 20
+		}
+	end
+
+	if episode % 2 == 0 then
+		local ave_q_max = agent:getAveQ()
+		print('ave_q_max = ' .. ave_q_max)
+		os.execute('echo ' .. ave_q_max .. ' >> ' .. Q_file)
+	end
 end

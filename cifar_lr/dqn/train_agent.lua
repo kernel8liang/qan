@@ -53,11 +53,11 @@ local cnnopt = {
 	dampening = 0,
 	momentum = 0.9,
 	epoch_step = "80",
-	max_epoch = 3,
-	model = 'nin',
+	max_epoch = 10,
+	model = 'wide-resnet',
 	optimMethod = 'sgd',
 	init_value = 10,
-	depth = 50,
+	depth = 40,
 	shortcutType = 'A',
 	nesterov = false,
 	dropout = 0,
@@ -214,7 +214,8 @@ while episode < max_episode do
 
 	engine.hooks.onEndEpoch = function(state)
 		local train_loss = meter:value()
-		local train_err = clerr:value{k = 1}
+		local train_err = clerr:value{k = 1 }
+		os.execute('echo ' .. (100 - train_err) .. '>> ' .. train_output_file)
 		local train_time = train_timer:time().real
 		meter:reset()
 		clerr:reset()
@@ -242,6 +243,9 @@ while episode < max_episode do
 		os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
 
 		if state.epoch == cnnopt.max_epoch then
+			os.execute('echo ------- >> ' .. train_output_file)
+			os.execute('echo ------- >> ' .. output_file)
+			os.execute('echo ------- >> ' .. lr_file)
 		end
 		if savebaselineweight == 1 then
 			torch.save('weights/1_conv1.t7', model:get(1):get(1).weight)
@@ -257,8 +261,7 @@ while episode < max_episode do
 	end
 
 	--local final_loss = 0.001
-	function getReward(batch_loss, verbose)
-		verbose = verbose or false
+	function getReward(batch_loss)
 		local reward = 0
 		--TODO: should get current error
 		if batch_loss then
@@ -270,16 +273,16 @@ while episode < max_episode do
 			end
 			last_loss = batch_loss
 		end
-		if (verbose) then
-			if batch_loss then print ('batch_loss: ' .. batch_loss) end
-			print ('reward: '.. reward)
+		if verbose then
+			if batch_loss and reward then
+				print ('batch_loss: ' .. batch_loss)
+				print ('reward: '.. reward)
+			end
 		end
 		return reward
 	end
 
-	function getState(batch_loss, verbose) --state is set in cnn.lua
-
-		verbose = verbose or false
+	function getState(batch_loss) --state is set in cnn.lua
 
 		--21*25 = 525
 		--s1 = torch.mean(s1, 1):view(-1)
@@ -290,7 +293,6 @@ while episode < max_episode do
 		s1 = s1:reshape(s1:size(1), s1:size(2), s1:size(3)*s1:size(4))
 
 		function get_g_c(m)
-			--print(m:size())
 			local r = m:reshape(m:nElement()) --m:view(-1)
 			local r_sort = torch.sort(r)
 			local n = r:nElement()
@@ -316,7 +318,6 @@ while episode < max_episode do
 		end
 		function get_h_d(s_param, type)
 			--g_c
-			--print("haha")
 			local s = torch.Tensor(16,3,9):copy(s_param)
 			local row = s:size(1)
 			local col = s:size(2)
@@ -359,8 +360,7 @@ while episode < max_episode do
 		end
 		--12 + 12*5 + 12*5 + 12*5 + 1 = 193
 
-		print(state:size())
-		local reward = getReward(batch_loss, verbose)
+		local reward = getReward(batch_loss)
 		if terminal == true then
 			terminal = false
 			return state, reward, true
@@ -382,7 +382,6 @@ while episode < max_episode do
 			local maxlearningRate = 0.5
 			local minlearningRate = 0.001
 			local learningRate_delta = cnnopt.learningRate --0.001 --opt.learningRate * 0.1
-			print('action = ' .. action)
 			if action == 1 then
 				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.1
 			elseif action == 2 then
@@ -392,18 +391,20 @@ while episode < max_episode do
 			end
 			if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
 			if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
-			print('learningRate = '..cnnopt.learningRate)
+			if verbose then
+				print('action = ' .. action)
+				print('learningRate = '..cnnopt.learningRate)
+			end
 			state.lr = cnnopt.learningRate
 			os.execute('echo ' .. state.lr .. ' >> ' .. lr_file)
-
 			state.config = tablex.deepcopy(cnnopt)
 			state.optim = tablex.deepcopy(cnnopt)
-		return getState(batch_loss, true)
+		return getState(batch_loss)
 	end
 
 	if take_action == 1 then
 		--DQN init
-		screen, reward, terminal = getState(2.33, true)
+		screen, reward, terminal = getState(2.33)
 		step_num = 1
 	end
 
@@ -421,21 +422,19 @@ while episode < max_episode do
 			  add_momentum_to_all_layer(model, tw)
 			end
 			--given state, take action
-			print('--------------------------------------------------------')
+			if verbose then
+				print('--------------------------------------------------------')
+			end
 			local action_index = 0
 			if episode % 2 == 1 then
 			   action_index = agent:perceive(reward, screen, terminal)
 			else
 			   action_index = agent:perceive(reward, screen, terminal, true, 0.05)
-			   --agent:compute_validation_statistics()
-			   --local ind = #v_history + 1
-			   --v_history[ind] = agent.v_avg
-			   -- --print('agent.q_max = '.. agent.q_max)
 			end
 			if not terminal then
 			   screen, reward, terminal = step(state, batch_loss, game_actions[action_index], true)
 			else
-			   screen, reward, terminal = getState(batch_loss, true)
+			   screen, reward, terminal = getState(batch_loss)
 			   reward = 0
 			   terminal = false
 			end

@@ -48,8 +48,9 @@ export learningRateDecayRatio=0.2
 export nesterov=true
 export randomcrop_type=reflection
 export depth=40
-export widen_factor=4
+export widen_factor=1
 export model=wide-resnet
+
 # tee redirects stdout both to screen and to file
 # have to create folder for script and model beforehand
 export save=logs/${model}_${RANDOM}${RANDOM}
@@ -58,5 +59,4 @@ mkdir -p $save
 
 cd dqn
 #../torch/bin/qlua train_agent.lua $args
-rm logs/test.log logs/train.log
-th train_agent.lua $args | tee $save/log.txt
+th train_agent.lua $args

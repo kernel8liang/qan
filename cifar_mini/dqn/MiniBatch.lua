@@ -81,7 +81,7 @@ end
 
 
 function minibatch:getOneHot()
-    local onehot = torch.zeros(self.rnum)
+    local onehot = torch.zeros(self.rnum):float()
     for i = 1, self.rnum do
         onehot[self.rouletee[i]] = 1
     end

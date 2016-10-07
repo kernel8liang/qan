@@ -392,6 +392,7 @@ while episode < max_episode do
 
 	if take_action == 1 then
 		--DQN init
+		minibatch:reset()
 		screen, reward, terminal = getState(2.33, true)
 		step_num = 1
 	end

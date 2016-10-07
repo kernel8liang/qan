@@ -8,11 +8,13 @@ if not dqn then
 	require 'initenv'
 end
 
+require 'config'
+
 local nql = torch.class('dqn.NeuralQLearner')
 
 
 function nql:__init(args)
-	self.state_dim  = 32*25 --256*10 --1024*5*5  --args.state_dim -- State dimensionality.
+	self.state_dim  = 193*1 --21*25 -- 200*125 --10*27 --512*10 --1024*5*5  --args.state_dim -- State dimensionality.
 	self.actions    = args.actions
 	self.n_actions  = #self.actions
 	self.verbose    = args.verbose
@@ -22,7 +24,7 @@ function nql:__init(args)
 	self.ep_start   = args.ep or 1
 	self.ep         = self.ep_start -- Exploration probability.
 	self.ep_end     = args.ep_end or self.ep
-	self.ep_endt    = args.ep_endt or 1000000
+	self.ep_endt    = args.ep_endt or 10000  --modified by lzc
 
 	---- learning rate annealing
 	self.lr_start       = args.lr or 0.01 --Learning rate.
@@ -49,11 +51,13 @@ function nql:__init(args)
 	self.clip_delta     = args.clip_delta
 	self.target_q       = args.target_q
 	self.bestq          = 0
+	self.ave_q			= 0
+	self.q_num			= 0 
 
 	self.gpu            = args.gpu
 
 	self.ncols          = args.ncols or 1  -- number of color channels in input
-	self.input_dims     = args.input_dims or {self.hist_len*self.ncols, 32, 25} --10, 512} --256, 100} --{self.hist_len*self.ncols, 84, 84}
+	self.input_dims     = args.input_dims or {self.hist_len*self.ncols, 193, 1} --21, 25} --200, 125}--10, 27} --80, 64} --10, 512} --256, 100} --{self.hist_len*self.ncols, 84, 84}
 	self.preproc        = args.preproc  -- name of preprocessing network
 	self.histType       = args.histType or "linear"  -- history type to use
 	self.histSpacing    = args.histSpacing or 1
@@ -164,6 +168,9 @@ function nql:__init(args)
 
 	self.q_max = 1
 	self.r_max = 1
+	self.q_average = 0
+	self.update_times = 0
+
 
 	self.w, self.dw = self.network:getParameters() 
 	self.dw:zero()
@@ -235,8 +242,13 @@ function nql:getQUpdate(args)
 	delta = r:clone():float()
 
 	if self.rescale_r then
-		delta:div(self.r_max)
+		delta:div(self.r_max)  -- r = r / r_max
 	end
+	reward_ = delta:float()[1]
+	if verbose then
+		print('rescaled reward = ' .. reward_)
+	end
+	os.execute('echo '..reward_..' >> logs/rescaled_rewards.log')
 	delta:add(q2)
 
 	-- q = Q(s,a)
@@ -244,6 +256,8 @@ function nql:getQUpdate(args)
 	q = torch.FloatTensor(q_all:size(1))
 	for i=1,q_all:size(1) do
 		q[i] = q_all[i][a[i]]
+		self.q_average = self.q_average + q_all[i]:max(1)
+		self.update_times = self.update_times + 1
 	end
 	delta:add(-1, q)
 
@@ -326,19 +340,21 @@ end
 function nql:perceive(reward, state, terminal, testing, testing_ep)
 	-- Preprocess state (will be set to nil if terminal)
 	--local state = self:preprocess(rawstate):float()
-	print ('perceive...')
+
 	local curState
 
+	-- reward = -1 ~ +1
 	if self.max_reward then
-		print('reward!!! = '..reward)
 		reward = math.min(reward, self.max_reward) --limit max reward
 	end
 	if self.min_reward then
-		print('reward!!! = '..reward)
 		reward = math.max(reward, self.min_reward) --limit min reward
 	end
 	if self.rescale_r then
 		self.r_max = math.max(self.r_max, reward)  --rescale max reward
+	end
+	if verbose then
+		print('perceive reward = '..reward)
 	end
 
 	-- TODO
@@ -386,7 +402,7 @@ function nql:perceive(reward, state, terminal, testing, testing_ep)
 	self.lastAction = actionIndex
 	self.lastTerminal = terminal
 
-	if self.target_q and self.numSteps % self.target_q == 1 then
+	if self.target_q and self.numSteps % self.target_q == 1 then -- save network to target_network when numsteps arrive target_q
 		self.target_network = self.network:clone()
 	end
 
@@ -408,10 +424,20 @@ function nql:eGreedy(state, testing_ep)
 	math.max(0, (self.ep_start - self.ep_end) * (self.ep_endt -
 	math.max(0, self.numSteps - self.learn_start))/self.ep_endt))
 	-- Epsilon greedy
-	if torch.uniform() < self.ep then
+	if torch.uniform() < self.ep then -- 随机生成action index
+		if verbose then
+			print("random action: ep="..self.ep)
+			print('ep_start=' .. self.ep_start)
+			print('ep_end=' .. self.ep_end)
+			print('ep_endt=' .. self.ep_endt)
+			print('numSteps=' .. self.numSteps)
+			print('learn_start=' .. self.learn_start)
+		end
 		return torch.random(1, self.n_actions)
-	else
-		print("greedygreedygreedygreedygreedygreedygreedygreedygreedygreedygreedygreedygreedy")
+	else  -- 通过greedy方法得到action index
+		if verbose then
+			print("greedy: ep="..self.ep)
+		end
 		return self:greedy(state)
 	end
 end
@@ -429,7 +455,6 @@ function nql:greedy(state)
 	end
 
 	local q = self.network:forward(state):float():squeeze()
-	print("q is : ")
 	local maxq = q[1]
 	local besta = {1}
 
@@ -443,8 +468,12 @@ function nql:greedy(state)
 		end
 	end
 	self.bestq = maxq
+	self.ave_q = self.ave_q + maxq
+	self.q_num = self.q_num + 1
 
-        print(maxq)
+	if verbose then
+		print('maxq = ' .. maxq)
+	end
 	local r = torch.random(1, #besta)
 
 	self.lastAction = besta[r]
@@ -452,11 +481,20 @@ function nql:greedy(state)
 	return besta[r]
 end
 
+function nql:getAveQ()
+	--[[local res = self.q_average / self.update_times
+	self.q_average = 0
+	self.update_times = 0]]
+	local res = self.ave_q / self.q_num
+	self.ave_q = 0
+	self.q_num = 0
+	return res
+end
 
 function nql:createNetwork() --input: state, output: n_actions rewards (input state, then choose action whose reward is max.)
 	local n_hid = 128
 	local mlp = nn.Sequential()
-	mlp:add(nn.Reshape(self.hist_len*self.ncols*self.state_dim))
+	mlp:add(nn.Reshape(self.hist_len*self.ncols*self.state_dim))  -- 4*1*(192*192)
 	mlp:add(nn.Linear(self.hist_len*self.ncols*self.state_dim, n_hid))
 	mlp:add(nn.Rectifier())
 	mlp:add(nn.Linear(n_hid, n_hid))
@@ -488,9 +526,11 @@ end
 
 
 function nql:report()
-	for k,v in ipairs(self.network) do
-		print(k,v)
+	if verbose then
+		for k,v in ipairs(self.network) do
+			print(k,v)
+		end
+		print(get_weight_norms(self.network))
+		print(get_grad_norms(self.network))
 	end
-	print(get_weight_norms(self.network))
-	print(get_grad_norms(self.network))
 end

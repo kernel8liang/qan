@@ -10,7 +10,7 @@ trans = torch.class('dqn.TransitionTable')
 
 
 function trans:__init(args)
-    self.stateDim = 32*25 --256*10 --1024 * 25  --51200 --args.stateDim  --modify the state dim from alewrap to cnnweights
+    self.stateDim =  193*1 --21*25 --200*125 --10*27 --512*10 --1024 * 25  --51200 --args.stateDim  --modify the state dim from alewrap to cnnweights
     self.numActions = args.numActions
 	print ('>>>>>>>>>>>>>>>>>>>>histlen = ' .. args.histLen)
     self.histLen = args.histLen
@@ -89,12 +89,9 @@ function trans:__init(args)
 end
 
 function trans:save_recent_x()
-	local ss = self.recent_s  
-	--print (ss)
-	local aa = self.recent_a  
-	--print (aa)
+	local ss = self.recent_s
+	local aa = self.recent_a
 	local tt = self.recent_t
-	--print (tt)
 end
 
 function trans:reset()
@@ -126,8 +123,8 @@ function trans:fill_buffer()
         self.buf_s2[buf_ind]:copy(s2)
         self.buf_term[buf_ind] = term
     end
-    self.buf_s  = self.buf_s:float():div(255)
-    self.buf_s2 = self.buf_s2:float():div(255)
+    self.buf_s  = self.buf_s:float() --:div(255)
+    self.buf_s2 = self.buf_s2:float() --:div(255)
     if self.gpu and self.gpu >= 0 then
         self.gpu_s:copy(self.buf_s)
         self.gpu_s2:copy(self.buf_s2)
@@ -276,7 +273,7 @@ end
 
 function trans:get_recent()
     -- Assumes that the most recent state has been added, but the action has not
-    return self:concatFrames(1, true):float():div(255)
+    return self:concatFrames(1, true):float()  --:div(255)
 end
 
 
@@ -307,7 +304,7 @@ function trans:add(s, a, r, term)
     end
 
     -- Overwrite (s,a,r,t) at insertIndex
-    self.s[self.insertIndex] = s:clone():float():mul(255)
+    self.s[self.insertIndex] = s:clone():float() --:mul(255)
     self.a[self.insertIndex] = a
     self.r[self.insertIndex] = r
     if term then
