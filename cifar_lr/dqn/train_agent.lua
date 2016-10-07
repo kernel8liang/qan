@@ -314,9 +314,10 @@ while episode < max_episode do
 			--return g_c_44
 			return g_c
 		end
-		function get_h_d(s, type)
+		function get_h_d(s_param, type)
 			--g_c
 			--print("haha")
+			local s = torch.Tensor(16,3,9):copy(s_param)
 			local row = s:size(1)
 			local col = s:size(2)
 			local size = row

@@ -216,7 +216,7 @@ while episode < max_episode do
 
 		local s1 = net:get(2).weight --20*25 (20,1,5,5)
 		local s2 = net:get(5).weight --25 (50,20,5,5)
-		local s3 = net:get(9).weight --800*500
+	
 		--21*25 = 525
 		--s1 = torch.mean(s1, 1):view(-1)
 		--s2 = torch.mean(s2, 1):view(-1)
@@ -249,9 +249,10 @@ while episode < max_episode do
 			--return g_c_44
 			return g_c
 		end
-		function get_h_d(s, type)
+		function get_h_d(s_param, type)
 			--g_c
 			--print("haha")
+			local s = torch.Tensor(20,1,25):copy(s_param)
 			local row = s:size(1)
 			local col = s:size(2)
 			local size = row
