@@ -417,10 +417,12 @@ while episode < max_episode do
 			if take_action == 0 then return end
 			local batch_loss = state.criterion.output
 			iteration_index = iteration_index + 1
-
-			if iteration_index < 1/meta_momentum_coefficient and add_momentum == 1 then
-			  add_momentum_to_all_layer(model, tw)
+			if iteration_index % take_action_interval ~= 0 then
+				return
 			end
+			--if iteration_index < 1/meta_momentum_coefficient and add_momentum == 1 then
+			--  add_momentum_to_all_layer(model, tw)
+			--end
 			--given state, take action
 			if verbose then
 				print('--------------------------------------------------------')

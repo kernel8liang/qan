@@ -52,6 +52,7 @@ take_action = 1
 savebaselineweight = 0
 curr_mode = 'traincnn'
 verbose = false
+take_action_interval = 100
 
 episode = 0
 os.execute('rm -f ' .. output_file)
