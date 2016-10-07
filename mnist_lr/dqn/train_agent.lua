@@ -157,7 +157,7 @@ while episode < max_episode do
 		curr_mode = 'traincnn'
 
 
-		local teset_acc = 100 - clerr:value{k = 1 }
+		local test_acc = 100 - clerr:value{k = 1}
 		if verbose then
 			print('test_acc = ' .. test_acc)
 		end
@@ -334,9 +334,12 @@ while episode < max_episode do
 
 		local batch_loss = state.criterion.output
 		iteration_index = iteration_index + 1
-		if iteration_index < momentum_times and add_momentum == 1 then
-			add_momentum_to_all_layer(net, tw)
+		if iteration_index % take_action_interval ~= 0 then
+			return
 		end
+		--if iteration_index < momentum_times and add_momentum == 1 then
+		--	add_momentum_to_all_layer(net, tw)
+		--end
 		--given state, take action
 		if verbose then
 			print('--------------------------------------------------------')
