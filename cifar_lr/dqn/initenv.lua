@@ -71,7 +71,7 @@ function torchSetup(_opt)
             print('Using CPU code only. GPU device id:', opt.gpu)
         end
     end
-    cutorch.setDevice(2)
+    
 
     --- set up random number generators
     -- removing lua RNG; seeding torch RNG with opt.seed and setting cutorch

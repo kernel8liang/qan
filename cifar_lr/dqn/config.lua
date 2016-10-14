@@ -43,21 +43,21 @@ cmd:text()
 opt = cmd:parse(arg)
 
 max_episode = 10
-train_output_file = 'logs/torchnet_train_loss.log'
 output_file = 'logs/torchnet_test_loss.log'
+train_output_file = 'logs/torchnet_train_loss.log'
 validation_output_file = 'logs/validation_loss.log'
 lr_file = 'logs/learning_rate.log'
 Q_file = 'logs/Q.log'
-take_action = 1
+take_action = 0
 savebaselineweight = 0
 curr_mode = 'traincnn'
-verbose = false
-take_action_interval = 100
 
 episode = 0
 os.execute('rm -f ' .. output_file)
 os.execute('rm -f ' .. validation_output_file)
+os.execute('rm -f ' .. train_output_file)
 os.execute('rm -f ' .. Q_file)
+os.execute('mkdir weights')
 
 
 --[[

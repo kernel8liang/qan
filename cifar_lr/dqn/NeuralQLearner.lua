@@ -8,8 +8,6 @@ if not dqn then
 	require 'initenv'
 end
 
-require 'config'
-
 local nql = torch.class('dqn.NeuralQLearner')
 
 
@@ -335,6 +333,7 @@ end
 function nql:perceive(reward, state, terminal, testing, testing_ep)
 	-- Preprocess state (will be set to nil if terminal)
 	--local state = self:preprocess(rawstate):float()
+	print ('perceive...')
 	local curState
 
 	-- reward = -1 ~ +1
@@ -347,9 +346,7 @@ function nql:perceive(reward, state, terminal, testing, testing_ep)
 	if self.rescale_r then
 		self.r_max = math.max(self.r_max, reward)  --rescale max reward
 	end
-	if verbose then
-		print('reward = '..reward)
-	end
+	print('reward = '..reward)
 
 	-- TODO
 	self.transitions:add_recent_state(state, terminal)
@@ -419,19 +416,15 @@ function nql:eGreedy(state, testing_ep)
 	math.max(0, self.numSteps - self.learn_start))/self.ep_endt))
 	-- Epsilon greedy
 	if torch.uniform() < self.ep then -- 随机生成action index
-		if verbose then
-			print("random action: ep="..self.ep)
-			print('ep_start=' .. self.ep_start)
-			print('ep_end=' .. self.ep_end)
-			print('ep_endt=' .. self.ep_endt)
-			print('numSteps=' .. self.numSteps)
-			print('learn_start=' .. self.learn_start)
-		end
+		print("random action: ep="..self.ep)
+		print('ep_start=' .. self.ep_start)
+		print('ep_end=' .. self.ep_end)
+		print('ep_endt=' .. self.ep_endt)
+		print('numSteps=' .. self.numSteps)
+		print('learn_start=' .. self.learn_start)
 		return torch.random(1, self.n_actions)
 	else  -- 通过greedy方法得到action index
-		if verbose then
-			print("greedy: ep="..self.ep)
-		end
+		print("greedygreedygreedygreedygreedy: ep="..self.ep)
 		return self:greedy(state)
 	end
 end
@@ -449,6 +442,7 @@ function nql:greedy(state)
 	end
 
 	local q = self.network:forward(state):float():squeeze()
+	print("q is : ")
 	local maxq = q[1]
 	local besta = {1}
 
@@ -465,9 +459,7 @@ function nql:greedy(state)
 	self.ave_q = self.ave_q + maxq
 	self.q_num = self.q_num + 1
 
-	if verbose then
-		print('maxq = ' .. maxq)
-	end
+	print('maxq = ' .. maxq)
 	local r = torch.random(1, #besta)
 
 	self.lastAction = besta[r]
@@ -517,11 +509,9 @@ end
 
 
 function nql:report()
-	if verbose then
-		for k,v in ipairs(self.network) do
-			print(k,v)
-		end
-		print(get_weight_norms(self.network))
-		print(get_grad_norms(self.network))
+	for k,v in ipairs(self.network) do
+		print(k,v)
 	end
+	print(get_weight_norms(self.network))
+	print(get_grad_norms(self.network))
 end

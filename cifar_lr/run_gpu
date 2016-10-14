@@ -13,7 +13,7 @@ update_freq=4
 actrep=4
 discount=0.99
 seed=1
-learn_start=6000
+learn_start=3000
 pool_frms_type="\"max\""
 pool_frms_size=2
 initial_priority="false"
@@ -42,15 +42,14 @@ args="-framework $FRAMEWORK -game_path $game_path -name $agent_name -env_params 
 
 export learningRate=0.1
 export epoch_step="{60,120,160}"
-export max_epoch=30
+export max_epoch=10
 export learningRateDecay=0
 export learningRateDecayRatio=0.2
 export nesterov=true
 export randomcrop_type=reflection
-export depth=28
-export widen_factor=1
+export depth=40
+export widen_factor=4
 export model=wide-resnet
-
 # tee redirects stdout both to screen and to file
 # have to create folder for script and model beforehand
 export save=logs/${model}_${RANDOM}${RANDOM}
@@ -59,4 +58,5 @@ mkdir -p $save
 
 cd dqn
 #../torch/bin/qlua train_agent.lua $args
-th train_agent.lua $args
+rm logs/test.log logs/train.log
+th train_agent.lua $args | tee $save/log.txt
