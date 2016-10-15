@@ -12,7 +12,7 @@ Let's take a look at the video of the training of (lower-layer) deep newtorks' w
 
 Imagine that we are playing a weird Atari game with the above screen. The screen seems simpler than real Atari games'. This reminds us of the difference between biomedical image processing and natural image processing. In biomedical images, the objects (e.g. red blood cells) are much simpler, thus needing simpler and smaller models. This means, we can use a small-sized DQN to contrl the training of a larger model, e.g. a ultra deep convolutional neural networks. 
 
-## Tuning learning rates on CIFAR_10 with WideResNet (10 epochs, 10 episodes)
+## Tuning learning rates on CIFAR-10 with WideResNet (50 epochs, 10 episodes)
 ```bash
 luarocks install torchnet
 luarocks install optnet
@@ -22,8 +22,6 @@ mkdir cifar_lr/dqn/datasets;
 #Download CIFAR_10 whitened dataset from [here](https://yadi.sk/d/em4b0FMgrnqxy) and save in cifar_lr/dqn/datasets
 cd cifar_lr/dqn/datasets;
 th split.lua; #get trainvalidata.t7
-cd ../..;
-/run_gpu
 ./run_gpu; #Start tune learning rate using dqn
 
 ```
