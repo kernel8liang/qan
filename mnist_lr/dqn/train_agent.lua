@@ -39,7 +39,7 @@ while episode < max_episode do
 	local last_validation_loss = 10000
 	local early_stop = false
 	local min_epoch = 10
-	local last_loss = nil
+	local last_loss
 	local step_num = 0
 	local log_sum = 0
 	local cnnopt = {
@@ -77,33 +77,33 @@ while episode < max_episode do
 	-- set up logistic regressor:
 
 	local net = nn.Sequential()
-	local Convolution = nn.SpatialConvolution
-	local Max = nn.SpatialMaxPooling
-	local Linear = nn.Linear
-	local Tanh = nn.Tanh
-	local Reshape = nn.Reshape
-	net:add(Reshape(1,28,28))
-	net:add(Convolution(1,20,5,5))
-	net:add(nn.Tanh())
-	net:add(Max(2,2,2,2))
-	net:add(Convolution(20,50,5,5))
-	net:add(nn.Tanh())
-	net:add(Max(2,2,2,2))
-	net:add(Reshape(50*4*4))
-	net:add(Linear(50*4*4, 500))
-	net:add(nn.Tanh())
-	net:add(Linear(500, 10))
 
+   -- fully connected layer
+   net:add(nn.Linear(28*28, 50))
+   net:add(nn.Tanh())
+   net:add(nn.Linear(50, 50))
+   net:add(nn.Tanh())
+   net:add(nn.Linear(50, 10))
+--   {
+--   1 : FloatTensor - size: 50x784
+--   2 : FloatTensor - size: 50
+--   3 : FloatTensor - size: 50x50
+--   4 : FloatTensor - size: 50
+--   5 : FloatTensor - size: 10x50
+--   6 : FloatTensor - size: 10
+--   }
+   local weight = net:parameters()
+   print(weight)
 	--torch.save('weights/start_w5.t7', net:get(5).weight)
 
 	--local net = torch.load('weights/net9.t7')
-	for i=1,8 do
-		if net:get(i).weight then
-			if verbose then
-				print(net:get(i).weight:size())
-			end
-		end
-	end
+--	for i=1, #weight do
+--		if net:get(i).weight then
+--			if verbose then
+--				print(net:get(i).weight:size())
+--			end
+--		end
+--	end
 	print(net)
 	local criterion = nn.CrossEntropyCriterion()
 
@@ -146,6 +146,7 @@ while episode < max_episode do
 		local train_loss = meter:value()
 		local train_err = clerr:value{k = 1 }
 		os.execute('echo ' .. (100 - train_err) .. '>> ' .. train_output_file)
+      print(100 - train_err)
 		meter:reset()
 		clerr:reset()
 		curr_mode = 'testcnn'
@@ -204,18 +205,19 @@ while episode < max_episode do
 
 	function getState(batch_loss) --state is set in cnn.lua
 
-		local s1 = net:get(2).weight --20*25 (20,1,5,5)
-		local s2 = net:get(5).weight --25 (50,20,5,5)
+		local s1 = net:get(1).weight --20*25 (20,1,5,5)
+		local s2 = net:get(3).weight --25 (50,20,5,5)
 
 		--21*25 = 525
 		--s1 = torch.mean(s1, 1):view(-1)
 		--s2 = torch.mean(s2, 1):view(-1)
 		--local tstate = torch.cat(s1, s2)
-		s1 = s1:reshape(s1:size(1), s1:size(2), s1:size(3)*s1:size(4))
-		s2 = s2:reshape(s2:size(1), s2:size(2), s2:size(3)*s2:size(4))
+--		s1 = s1:reshape(s1:size(1), s1:size(2), s1:size(3)*s1:size(4))
+--		s2 = s2:reshape(s2:size(1), s2:size(2), s2:size(3)*s2:size(4))
 
 		function get_g_c(m)
 			local r = m:reshape(m:nElement()) --m:view(-1)
+--         print('r', #r)
 			local r_sort = torch.sort(r)
 			local n = r:nElement()
 			local n1 = math.floor(n*0.25)
@@ -240,15 +242,16 @@ while episode < max_episode do
 		end
 		function get_h_d(s_param, type)
 			--g_c
-			local s = torch.Tensor(20,1,25):copy(s_param)
+--         print(s_param:size())
+			local s = torch.Tensor(s_param:size(1), s_param:size(2)):copy(s_param)
 			local row = s:size(1)
 			local col = s:size(2)
 			local size = row
 			type = type or 0
-			if type == 1 then
-				size = row * col
-				s = s:reshape(size, s:size(3))
-			end
+--			if type == 1 then
+--				size = row * col
+--				s = s:reshape(size, s:size(3))
+--			end
 			local g = torch.FloatTensor(size, 12) -- 44 = 12 + 32
 			for i = 1, size do
 				local g_c = get_g_c(s[i])
@@ -273,7 +276,7 @@ while episode < max_episode do
 		res[#res+1] = get_g_c(s1):view(-1)
 		res[#res+1] = get_h_d(s1):view(-1)
 		res[#res+1] = get_h_d(s1:transpose(1,2)):view(-1)
-		res[#res+1] = get_h_d(s1, 1):view(-1)
+--		res[#res+1] = get_h_d(s1, 1):view(-1)
 
 		--concat LR in weight feature
 		res[#res+1] = torch.FloatTensor{cnnopt.learningRate}:log()
@@ -301,7 +304,7 @@ while episode < max_episode do
 		]]
 		step_num = step_num + 1
 		local maxlearningRate = 0.2
-		local minlearningRate = 0.00001
+		local minlearningRate = 0.000001
 		local learningRate_delta = state.lr --0.001 --opt.learningRate * 0.1
 		if action == 1 then
 			cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.07
@@ -377,7 +380,7 @@ while episode < max_episode do
 			config = {
 				learningRate = cnnopt.learningRate
 			},
-			maxepoch = 20
+			maxepoch = 50
 		}
 	end
 

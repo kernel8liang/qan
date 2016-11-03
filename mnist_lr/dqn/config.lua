@@ -43,12 +43,15 @@ cmd:text()
 opt = cmd:parse(arg)
 
 max_episode = 1000
-train_output_file = 'logs/torchnet_train_loss.log'
-output_file = 'logs/torchnet_test_loss.log'
-validation_output_file = 'logs/validation_loss.log'
-lr_file = 'logs/learning_rate.log'
-rescale_reward_file = 'logs/rescaled_rewards.log'
-Q_file = 'logs/Q.log'
+
+prefix = 'test'
+
+train_output_file = 'logs/'..prefix..'_torchnet_train_loss.log'
+output_file = 'logs/'..prefix..'_torchnet_test_loss.log'
+validation_output_file = 'logs/'..prefix..'_validation_loss.log'
+lr_file = 'logs/'..prefix..'_learning_rate.log'
+rescale_reward_file = 'logs/'..prefix..'_rescaled_rewards.log'
+Q_file = 'logs/'..prefix..'_Q.log'
 take_action = 1
 savebaselineweight = 0
 add_momentum = 0
