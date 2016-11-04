@@ -85,7 +85,7 @@ while episode < max_episode do
 	local step_num = 0
 	local log_sum = 0
 	cnnopt = xlua.envparams(cnnopt)
-
+	local restart_lr = 0.1
 	cnnopt.epoch_step = tonumber(cnnopt.epoch_step) or loadstring('return '..cnnopt.epoch_step)()
 	print(cnnopt)
 
@@ -241,7 +241,7 @@ while episode < max_episode do
 			n_parameters = state.params:numel(),
 		}
 		os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
-
+		if state.epoch > 0 and state.epoch % 50 == 0 then restart_lr = restart_lr / 10 end
 		if state.epoch == cnnopt.max_epoch then
 		end
 		if savebaselineweight == 1 then
@@ -386,7 +386,7 @@ while episode < max_episode do
 			if action == 1 then
 				cnnopt.learningRate = cnnopt.learningRate - learningRate_delta*0.03
 			elseif action == 2 then
-				cnnopt.learningRate = 0.1
+				cnnopt.learningRate = restart_lr
 			end
 			if cnnopt.learningRate > maxlearningRate then cnnopt.learningRate = maxlearningRate end
 			if cnnopt.learningRate < minlearningRate then cnnopt.learningRate = minlearningRate end
