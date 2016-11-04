@@ -48,7 +48,7 @@ train_output_file = 'logs/torchnet_train_loss.log'
 validation_output_file = 'logs/validation_loss.log'
 lr_file = 'logs/learning_rate.log'
 Q_file = 'logs/Q.log'
-take_action = 0
+take_action = 1
 savebaselineweight = 0
 curr_mode = 'traincnn'
 
