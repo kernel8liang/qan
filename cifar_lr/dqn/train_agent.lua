@@ -41,6 +41,9 @@ local td_history = {}
 local reward_history = {}
 local step = 0
 time_history[1] = 0
+-- after how many epochs, decay the restart action
+local restart_schedule = 30
+local restart_decay = 5
 
 local cnnopt = {
 	dataset = './datasets/cifar10_whitened.t7',
@@ -241,7 +244,7 @@ while episode < max_episode do
 			n_parameters = state.params:numel(),
 		}
 		os.execute('echo ' .. (100 - clerr:value{k = 1}) .. '>> ' .. output_file)
-		if state.epoch > 0 and state.epoch % 50 == 0 then restart_lr = restart_lr / 10 end
+		if state.epoch > 0 and state.epoch % restart_schedule == 0 then restart_lr = restart_lr / restart_decay end
 		if state.epoch == cnnopt.max_epoch then
 		end
 		if savebaselineweight == 1 then
