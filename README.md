@@ -1,4 +1,4 @@
-# Withdrawed
+# Withdrawn
 
 > Source code to the paper [https://arxiv.org/abs/1606.01467](https://arxiv.org/abs/1606.01467)
 
