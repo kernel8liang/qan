@@ -1,12 +1,12 @@
-# Rewriting
+# Withdrawn
 
 > Source code to the paper [https://arxiv.org/abs/1606.01467](https://arxiv.org/abs/1606.01467)
 
-The previous version of source-code has some weird bugs under certain situations. I sincerely apologize for any misunderstanding or confusion that article may have caused. 
+The previous version of source-code has some weird bugs under certain situations. Specifically, the `epsilon` hyperparameter in the original paper when testing is set to 0.05, which means the `restart` action is due to random exploration but not based on the learned policy. 
 
-Due to some issues such as the ad-hoc developments, I am now rewriting the whole code in TensorFlow and will release it by 20 November, 2016. 
+I've been always trying to make my results reproducible as suggested in [Challenges in irreproducible research](http://www.nature.com.libproxy1.nus.edu.sg/news/reproducibility-1.17552). It's me who first found the bug and I chose to withdraw it after double check. 
 
-Initial experiments with the new code shows that the state features comprising weight statistics and the reward funcitons are effective. 
+I sincerely apologize for any misunderstanding or confusion that article may have caused. 
 
 ## Contact
 
